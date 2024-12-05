@@ -69,6 +69,9 @@
 // h = 16
 // src = sprite.png
 
+#define TILESIZE_DEFAULT 16
+#define DEPTH_DEFAULT 4
+
 //
 // Pixel data formats.
 //
@@ -305,8 +308,7 @@ static bool validate_angle(int angle)
 bool conv_init(Conv *s)
 {
 	memset(s, 0, sizeof(*s));
-	s->depth = 4;
-	s->tilesize = 16;
+	s->depth = DEPTH_DEFAULT;
 	return true;
 }
 
@@ -435,6 +437,7 @@ static bool conv_entry_add(Conv *s)
 	e->frame_cfg = s->frame_cfg;
 
 	FrameCfg *frame_cfg = &e->frame_cfg;
+	frame_cfg->tilesize = TILESIZE_DEFAULT;
 
 	//
 	// Load image data into 8bpp buffer.
@@ -702,7 +705,11 @@ int main(int argc, char **argv)
 
 	// the actual conversion is kicked off in the INI handler, when `convert` is set.
 	ret = ini_parse(argv[1], &handler, &conv);
-	if (!ret) return -1;
+	if (ret)
+	{
+		fprintf(stderr, "Error parsing \"%s\".\n", argv[0]);
+		return -1;
+	}
 
 	// Now emit a pile of CHR data
 	char fname_buf[512];
