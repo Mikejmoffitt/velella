@@ -1,0 +1,4 @@
+obj/*.o
+*.swp
+velella
+velella.exe
