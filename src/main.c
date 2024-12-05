@@ -305,6 +305,8 @@ static bool validate_angle(int angle)
 bool conv_init(Conv *s)
 {
 	memset(s, 0, sizeof(*s));
+	s->depth = 4;
+	s->tilesize = 16;
 	return true;
 }
 
