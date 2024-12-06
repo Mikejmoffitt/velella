@@ -1,4 +1,5 @@
 obj/*.o
+obj/
 *.swp
 velella
 velella.exe
