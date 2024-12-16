@@ -136,6 +136,7 @@ struct Entry
 	char symbol[256];  // Symbol name as enumerated
 	char symbol_upper[256];
 	uint16_t pal[256];
+	int pal_size;
 
 	Entry *next;  // Pointer to the next in the LL.
 
@@ -189,6 +190,7 @@ static void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int p
 	        e->id, e->symbol,
 	        frame_cfg->w, frame_cfg->h, e->frames);
 	fprintf(f_inc, "%s_PAL_OFFS = $%X\n", e->symbol_upper, pal_offs);
+	fprintf(f_inc, "%s_PAL_LEN = $%X\n", e->symbol_upper, e->pal_size);
 
 	switch (conv->data_format)
 	{
@@ -471,6 +473,7 @@ static bool conv_entry_add(Conv *s)
 	//
 	// Make native palette data (host endianness)
 	//
+	e->pal_size = state.info_png.color.palettesize;
 	pal_pack_set(s->pal_format, state.info_png.color.palette, e->pal, state.info_png.color.palettesize);
 
 	//
@@ -782,15 +785,14 @@ int main(int argc, char **argv)
 		entry_emit_chr(e, &conv, f_chr1, f_chr2);
 
 		// Contribute to palette file
-		const int pal_len = ((conv.depth == 4) ? 16 : 256);
-		for (int i = 0; i < pal_len; i++)
+		for (int i = 0; i < e->pal_size; i++)
 		{
 			const uint8_t upper = e->pal[i] >> 8;
 			const uint8_t lower = e->pal[i] & 0x00FF;
 			fputc(upper, f_pal);
 			fputc(lower, f_pal);
 		}
-		pal_offs += pal_len * sizeof(uint16_t);
+		pal_offs += e->pal_size * sizeof(uint16_t);
 		e = e->next;
 		if (e)
 		{
