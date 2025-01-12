@@ -453,7 +453,7 @@ static bool conv_entry_add(Conv *s)
 	LodePNGState state;
 	if (error)
 	{
-		fprintf(stderr, "[ENTRY $%03X] LodePNG error %u: %s\n", e->id, error,
+		fprintf(stderr, "[ENTRY $%03X: %s] LodePNG error %u: %s\n", e->id, fname, error,
 		        lodepng_error_text(error));
 		return false;
 	}
@@ -464,7 +464,7 @@ static bool conv_entry_add(Conv *s)
 	error = lodepng_decode(&px, &png_w, &png_h, &state, png, png_fsize);
 	if (error)
 	{
-		fprintf(stderr, "[ENTRY $%03X] LodePNG error %u: %s\n", e->id, error,
+		fprintf(stderr, "[ENTRY $%03X: %s] LodePNG error %u: %s\n", e->id, fname, error,
 		        lodepng_error_text(error));
 		free(png);
 		return false;
