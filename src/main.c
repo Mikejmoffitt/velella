@@ -502,7 +502,6 @@ static bool conv_entry_add(Conv *s)
 
 		if (match)
 		{
-			printf("Palette duplicate found between #%d and #%d\n", e->id, f->id);
 			e->pal_ref = f;
 			break;
 		}
