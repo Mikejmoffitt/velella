@@ -137,6 +137,8 @@ struct Entry
 	char symbol_upper[256];
 	uint16_t pal[256];
 	int pal_size;
+	Entry *pal_ref;  // Pointer to pre-existing entry with the same palette.
+	int pal_block_offs;  // -1 if not set.
 
 	Entry *next;  // Pointer to the next in the LL.
 
@@ -163,6 +165,7 @@ typedef struct Conv
 	// Linked list of sprites read
 	Entry *entry_head;  // First in the entries link list.
 	Entry *entry_tail;  // Pointer to the end of the entries list.
+	unsigned int entry_count;
 
 	// Meta config
 	char out[256];           // Output base filename.
@@ -475,6 +478,37 @@ static bool conv_entry_add(Conv *s)
 	//
 	e->pal_size = state.info_png.color.palettesize;
 	pal_pack_set(s->pal_format, state.info_png.color.palette, e->pal, state.info_png.color.palettesize);
+	e->pal_ref = NULL;
+	
+	// See if another entry has the same palette, and get a reference to it if so.
+	Entry *f = s->entry_head;
+	while (f && (f != e))
+	{
+		bool match = true;
+		// Palette size of other is >= this one's palette, and data matches
+		if (f->pal_size >= e->pal_size)
+		{
+			for (int i = 0; i < e->pal_size; i++)
+			{
+				if (e->pal[i] == f->pal[i]) continue;
+				match = false;
+				break;
+			}
+		}
+		else
+		{
+			match = false;
+		}
+
+		if (match)
+		{
+			printf("Palette duplicate found between #%d and #%d\n", e->id, f->id);
+			e->pal_ref = f;
+			break;
+		}
+
+		f = f->next;
+	}
 
 	//
 	// Set size and sprite count information.
@@ -595,6 +629,7 @@ static bool conv_entry_add(Conv *s)
 	free(png);
 	free(px);
 
+	s->entry_count++;
 	return true;
 }
 
@@ -686,9 +721,11 @@ static int handler(void *user, const char *section, const char *name, const char
 		printf("WARNING: Unhandled directive \"%s\"\n", name);
 		return 0;
 	}
-
 	return 1;
 }
+
+
+
 
 int main(int argc, char **argv)
 {
@@ -781,18 +818,31 @@ int main(int argc, char **argv)
 	int pal_offs = 0;
 	while (e)
 	{
-		entry_emit_meta(e, &conv, f_inc, pal_offs);
+		// If this entry references another's palette, copy the entry offs, and
+		// do not add palette data.
+		if (e->pal_ref)
+		{
+			Entry *f = e->pal_ref;
+			e->pal_block_offs = f->pal_block_offs;
+		}
+		else
+		{
+			// Otherwise, mark palette offs by the output position and write
+			// unique palette data.
+			e->pal_block_offs = pal_offs;
+			for (int i = 0; i < e->pal_size; i++)
+			{
+				const uint8_t upper = e->pal[i] >> 8;
+				const uint8_t lower = e->pal[i] & 0x00FF;
+				fputc(upper, f_pal);
+				fputc(lower, f_pal);
+			}
+			pal_offs += e->pal_size * sizeof(uint16_t);
+		}
+
+		entry_emit_meta(e, &conv, f_inc, e->pal_block_offs);
 		entry_emit_chr(e, &conv, f_chr1, f_chr2);
 
-		// Contribute to palette file
-		for (int i = 0; i < e->pal_size; i++)
-		{
-			const uint8_t upper = e->pal[i] >> 8;
-			const uint8_t lower = e->pal[i] & 0x00FF;
-			fputc(upper, f_pal);
-			fputc(lower, f_pal);
-		}
-		pal_offs += e->pal_size * sizeof(uint16_t);
 		e = e->next;
 		if (e)
 		{
