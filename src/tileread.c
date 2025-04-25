@@ -1,6 +1,7 @@
 #include "tileread.h"
 
 #include <stdbool.h>
+#include <stdio.h>
 
 // #define TILEREAD_DEBUG_OUT
 
@@ -73,6 +74,8 @@ uint8_t *tile_read_frame(const uint8_t *px, int png_w, int png_x, int png_y, int
 	const bool yoko = ((angle == 0) || (angle == 180));
 	const int tile_outer_count = (tilesize <= 0) ? 1 : ((yoko ? sw_adj : sh_adj)/tilesize);
 	const int tile_inner_count = (tilesize <= 0) ? 1 : ((yoko ? sh_adj : sw_adj)/tilesize);
+
+//	printf("read (%d, %d) size %d, %d (ts=%d)\n", png_x, png_y, sw_adj, sh_adj, tilesize);
 
 	for (int tile_outer = 0; tile_outer < tile_outer_count; tile_outer++)
 	{

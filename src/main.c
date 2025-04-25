@@ -442,7 +442,6 @@ static bool conv_entry_add(Conv *s)
 	e->frame_cfg = s->frame_cfg;
 
 	FrameCfg *frame_cfg = &e->frame_cfg;
-	frame_cfg->tilesize = TILESIZE_DEFAULT;
 
 	//
 	// Load image data into 8bpp buffer.
