@@ -1,0 +1,116 @@
+#include "entry_emit.h"
+
+void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs, bool c_lang)
+{
+	const FrameCfg *frame_cfg = &e->frame_cfg;
+	printf("Entry $%03X \"%s\": %d x %d, %d frames/tiles\n",
+	       e->id, e->symbol, e->frame_cfg.w, e->frame_cfg.h, e->frames);
+
+	const char *k_str_comment = c_lang ? "//" : "; ";
+	const char *k_str_hex = c_lang ? "0x" : "$";
+	const char *k_str_def = c_lang ? "#define " : "";
+	const char *k_str_equ = c_lang ? "" : "= ";
+
+	// Write inc entry
+	fprintf(f_inc, "%s Entry $%03X \"%s\": %d x %d, %d frames/tiles\n",
+	        k_str_comment, e->id, e->symbol,
+	        frame_cfg->w, frame_cfg->h, e->frames);
+	fprintf(f_inc, "%s%s_PAL_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, pal_offs);
+	fprintf(f_inc, "%s%s_PAL_LEN %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->pal_size);
+
+	switch (conv->data_format)
+	{
+		case DATA_FORMAT_SP013:
+			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
+			fprintf(f_inc, "%s%s_CODE_HI %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code >> 16);
+			fprintf(f_inc, "%s%s_CODE_LOW %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code & 0xFFFF);
+			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
+			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
+			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
+			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
+			fprintf(f_inc, "%s%s_SIZE %s%s%04X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->sp013.size_code);
+			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per);
+			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+			break;
+
+		case DATA_FORMAT_BG038:
+			fprintf(f_inc, "%s%s_CODE8 %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
+			fprintf(f_inc, "%s%s_CODE8_HI %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code >> 16);
+			fprintf(f_inc, "%s%s_CODE8_LOW %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code & 0xFFFF);
+			fprintf(f_inc, "%s%s_CODE16 %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code / 4);
+			fprintf(f_inc, "%s%s_CODE16_HI %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (frame_cfg->code / 4) >> 16);
+			fprintf(f_inc, "%s%s_CODE16_LOW %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (frame_cfg->code / 4) & 0xFFFF);
+			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
+			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
+			fprintf(f_inc, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
+			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);  // whereas the "frame" is used to chop major tiles
+			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->w);
+			break;
+
+		case DATA_FORMAT_DIRECT:
+			fprintf(f_inc, "%s%s_DATA_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*frame_cfg->src_tex_w*frame_cfg->src_tex_h);
+			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->w*frame_cfg->h);
+			fprintf(f_inc, "%s%s_TILE_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->tilesize*frame_cfg->tilesize);
+			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
+			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
+			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+			break;
+
+		default:
+			break;
+	}
+	fprintf(f_inc, "\n");
+}
+
+void entry_emit_chr(const Entry *e, const Conv *conv, FILE *f_chr1, FILE *f_chr2)
+{
+	// Dump CHR data into CHR file(s)
+	uint8_t *chr = e->chr;
+	switch (conv->data_format)
+	{
+		case DATA_FORMAT_SP013:
+			for (size_t i = 0; i < e->chr_bytes/2; i++)
+			{
+				const uint8_t fetchpx0 = *chr++;
+				const uint8_t fetchpx1 = *chr++;
+
+				// Inverted data order for SP013.
+				const uint8_t px0 = fetchpx1;
+				const uint8_t px1 = fetchpx0;
+
+				const uint8_t lowbyte = ((px0 << 4) & 0xF0) | (px1 & 0x0F);
+				const uint8_t hibyte = (px0 & 0xF0) | ((px1 >> 4) & 0x0F);
+
+				fputc(lowbyte, f_chr1);
+				if (f_chr2) fputc(hibyte, f_chr2);  // TODO: good option for selecting plane split
+			}
+			break;
+
+		case DATA_FORMAT_BG038:
+			for (size_t i = 0; i < e->chr_bytes/2; i++)
+			{
+				const uint8_t px0 = *chr++;
+				const uint8_t px1 = *chr++;
+
+				const uint8_t lowbyte = ((px0 << 4) & 0xF0) | (px1 & 0x0F);
+				const uint8_t hibyte = (px0 & 0xF0) | ((px1 >> 4) & 0x0F);
+
+				// Put main plane on low bytes, upper 4bpp on even bytes
+				fputc(lowbyte, f_chr1);
+				if (conv->depth == 8) fputc(hibyte, f_chr1);
+			}
+			break;
+
+		case DATA_FORMAT_DIRECT:
+			for (size_t i = 0; i < e->chr_bytes; i++)
+			{
+				const uint8_t px = *chr++;
+				fputc(px, f_chr1);
+			}
+			break;
+
+		default:
+			break;
+
+	}
+}

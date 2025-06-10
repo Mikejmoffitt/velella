@@ -2,7 +2,7 @@
 // Velella
 // main.c
 //
-// Copyright 2024 Michael J Moffitt
+// Copyright 2024-2025 Mike "MOF" Moffitt
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the “Software”), to
@@ -31,6 +31,9 @@
 #include <ctype.h>
 #include "pal.h"
 #include "tileread.h"
+#include "types.h"
+#include "entry_emit.h"
+#include "format.h"
 
 // =======
 // 
@@ -71,226 +74,6 @@
 
 #define TILESIZE_DEFAULT 16
 #define DEPTH_DEFAULT 4
-
-//
-// Pixel data formats.
-//
-typedef enum DataFormat
-{
-	DATA_FORMAT_UNSPECIFIED,
-	DATA_FORMAT_SP013,       // Atlus 013 sprite data
-	DATA_FORMAT_BG038,       // Atlus 038 background tile data
-	DATA_FORMAT_DIRECT,      // Raw tile conversion.
-	DATA_FORMAT_COUNT
-} DataFormat;
-
-const char *kstring_for_data_format[DATA_FORMAT_COUNT] =
-{
-	[DATA_FORMAT_UNSPECIFIED] = "{unspecified}",
-	[DATA_FORMAT_DIRECT] = "direct",
-	[DATA_FORMAT_SP013] = "sp013",
-	[DATA_FORMAT_BG038] = "bg038",
-};
-
-static DataFormat data_format_for_string(const char *str)
-{
-	for (int i = 0; i < DATA_FORMAT_COUNT; i++)
-	{
-		if (strcmp(str, kstring_for_data_format[i]) == 0)
-		{
-			return i;
-		}
-	}
-	return DATA_FORMAT_UNSPECIFIED;
-}
-
-const char *string_for_data_format(DataFormat fmt)
-{
-	if (fmt < 0 || fmt >= DATA_FORMAT_COUNT) return kstring_for_data_format[DATA_FORMAT_UNSPECIFIED];
-	return kstring_for_data_format[fmt];
-}
-
-//
-// Conversion entry data.
-//
-
-// An Entry represents a source image, and a symbol that can be referenced.
-// As this tool was born out of a need of converting data from sprite sheets,
-// an entry has the concept of "Frames" chopped out of the source texture.
-// In addition to frames, a tile size can be defined, which is the minimum-size
-// building block used to create the image. It is yet another way to subdivide
-// the data.
-typedef struct FrameCfg
-{
-	int src_tex_w, src_tex_h;  // Source texture dimensions (rounded to tile)
-	int w, h;                  // Sprite frame dimensions. 0 == whole image.
-	int angle;                 // Rotation of the frame.
-	uint32_t code;             // Starting code in graphics memory.
-	int tilesize;              // Size of one tile.
-} FrameCfg;
-
-typedef struct Entry Entry;
-struct Entry
-{
-	int id;
-	char symbol[256];  // Symbol name as enumerated
-	char symbol_upper[256];
-	uint16_t pal[256];
-	int pal_size;
-	Entry *pal_ref;  // Pointer to pre-existing entry with the same palette.
-	int pal_block_offs;  // -1 if not set.
-
-	Entry *next;  // Pointer to the next in the LL.
-
-	FrameCfg frame_cfg;
-
-	// Starting code and code increment per frame / element.
-	uint32_t code_per;
-	int frames;
-
-	// DataFormat-specific things.
-	struct
-	{
-		uint16_t size_code;
-	} sp013;
-
-	// The bitmap data.
-	uint8_t *chr;
-	size_t chr_bytes;
-};
-
-// State for the conversion process.
-typedef struct Conv
-{
-	// Linked list of sprites read
-	Entry *entry_head;  // First in the entries link list.
-	Entry *entry_tail;  // Pointer to the end of the entries list.
-	unsigned int entry_count;
-
-	// Meta config
-	char out[256];           // Output base filename.
-	DataFormat data_format;  // Arrangement of data.
-	PalFormat pal_format;
-	int depth;             // Bits per pixel.
-
-	// Config state from ini for next entry
-	char src[256];           // Source image filename.
-	char symbol[256];        // Symbol name (section).
-	FrameCfg frame_cfg;
-} Conv;
-
-//
-// Entry emission functions.
-//
-static void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs)
-{
-	const FrameCfg *frame_cfg = &e->frame_cfg;
-	printf("Entry $%03X \"%s\": %d x %d, %d frames/tiles\n",
-	       e->id, e->symbol, e->frame_cfg.w, e->frame_cfg.h, e->frames);
-
-	// Write inc entry
-	fprintf(f_inc, "; Entry $%03X \"%s\": %d x %d, %d frames/tiles\n",
-	        e->id, e->symbol,
-	        frame_cfg->w, frame_cfg->h, e->frames);
-	fprintf(f_inc, "%s_PAL_OFFS = $%X\n", e->symbol_upper, pal_offs);
-	fprintf(f_inc, "%s_PAL_LEN = $%X\n", e->symbol_upper, e->pal_size);
-
-	switch (conv->data_format)
-	{
-		case DATA_FORMAT_SP013:
-			fprintf(f_inc, "%s_CODE = $%X\n", e->symbol_upper, frame_cfg->code);
-			fprintf(f_inc, "%s_CODE_HI = $%X\n", e->symbol_upper, frame_cfg->code >> 16);
-			fprintf(f_inc, "%s_CODE_LOW = $%X\n", e->symbol_upper, frame_cfg->code & 0xFFFF);
-			fprintf(f_inc, "%s_SRC_TEX_W = %d\n", e->symbol_upper, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s_SRC_TEX_H = %d\n", e->symbol_upper, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s_W = %d\n", e->symbol_upper, frame_cfg->w);
-			fprintf(f_inc, "%s_H = %d\n", e->symbol_upper, frame_cfg->h);
-			fprintf(f_inc, "%s_SIZE = $%04X\n", e->symbol_upper, e->sp013.size_code);
-			fprintf(f_inc, "%s_FRAME_OFFS = $%X\n", e->symbol_upper, e->code_per);
-			fprintf(f_inc, "%s_FRAMES = %d\n", e->symbol_upper, e->frames);
-			break;
-
-		case DATA_FORMAT_BG038:
-			fprintf(f_inc, "%s_CODE8 = $%X\n", e->symbol_upper, frame_cfg->code);
-			fprintf(f_inc, "%s_CODE8_HI = $%X\n", e->symbol_upper, frame_cfg->code >> 16);
-			fprintf(f_inc, "%s_CODE8_LOW = $%X\n", e->symbol_upper, frame_cfg->code & 0xFFFF);
-			fprintf(f_inc, "%s_CODE16 = $%X\n", e->symbol_upper, frame_cfg->code / 4);
-			fprintf(f_inc, "%s_CODE16_HI = $%X\n", e->symbol_upper, (frame_cfg->code / 4) >> 16);
-			fprintf(f_inc, "%s_CODE16_LOW = $%X\n", e->symbol_upper, (frame_cfg->code / 4) & 0xFFFF);
-			fprintf(f_inc, "%s_W = %d\n", e->symbol_upper, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s_H = %d\n", e->symbol_upper, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s_TILESIZE = %d\n", e->symbol_upper, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
-			fprintf(f_inc, "%s_TILES_W = %d\n", e->symbol_upper, frame_cfg->src_tex_w / frame_cfg->w);  // whereas the "frame" is used to chop major tiles
-			fprintf(f_inc, "%s_TILES_H = %d\n", e->symbol_upper, frame_cfg->src_tex_h / frame_cfg->w);
-			break;
-
-		case DATA_FORMAT_DIRECT:
-			fprintf(f_inc, "%s_DATA_OFFS = $%X\n", e->symbol_upper, frame_cfg->code*frame_cfg->src_tex_w*frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s_FRAME_OFFS = $%X\n", e->symbol_upper, frame_cfg->w*frame_cfg->h);
-			fprintf(f_inc, "%s_TILE_OFFS = $%X\n", e->symbol_upper, frame_cfg->tilesize*frame_cfg->tilesize);
-			fprintf(f_inc, "%s_W = %d\n", e->symbol_upper, frame_cfg->w);
-			fprintf(f_inc, "%s_H = %d\n", e->symbol_upper, frame_cfg->h);
-			fprintf(f_inc, "%s_FRAMES = %d\n", e->symbol_upper, e->frames);
-			break;
-
-		default:
-			break;
-	}
-	fprintf(f_inc, "\n");
-}
-
-static void entry_emit_chr(const Entry *e, const Conv *conv, FILE *f_chr1, FILE *f_chr2)
-{
-	// Dump CHR data into CHR file(s)
-	uint8_t *chr = e->chr;
-	switch (conv->data_format)
-	{
-		case DATA_FORMAT_SP013:
-			for (size_t i = 0; i < e->chr_bytes/2; i++)
-			{
-				const uint8_t fetchpx0 = *chr++;
-				const uint8_t fetchpx1 = *chr++;
-
-				// Inverted data order for SP013.
-				const uint8_t px0 = fetchpx1;
-				const uint8_t px1 = fetchpx0;
-
-				const uint8_t lowbyte = ((px0 << 4) & 0xF0) | (px1 & 0x0F);
-				const uint8_t hibyte = (px0 & 0xF0) | ((px1 >> 4) & 0x0F);
-
-				fputc(lowbyte, f_chr1);
-				if (f_chr2) fputc(hibyte, f_chr2);  // TODO: good option for selecting plane split
-			}
-			break;
-
-		case DATA_FORMAT_BG038:
-			for (size_t i = 0; i < e->chr_bytes/2; i++)
-			{
-				const uint8_t px0 = *chr++;
-				const uint8_t px1 = *chr++;
-
-				const uint8_t lowbyte = ((px0 << 4) & 0xF0) | (px1 & 0x0F);
-				const uint8_t hibyte = (px0 & 0xF0) | ((px1 >> 4) & 0x0F);
-
-				// Put main plane on low bytes, upper 4bpp on even bytes
-				fputc(lowbyte, f_chr1);
-				if (conv->depth == 8) fputc(hibyte, f_chr1);
-			}
-			break;
-
-		case DATA_FORMAT_DIRECT:
-			for (size_t i = 0; i < e->chr_bytes; i++)
-			{
-				const uint8_t px = *chr++;
-				fputc(px, f_chr1);
-			}
-			break;
-
-		default:
-			break;
-
-	}
-}
 
 //
 // Conversion process functions.
@@ -756,6 +539,7 @@ int main(int argc, char **argv)
 	FILE *f_chr2 = NULL;
 	FILE *f_pal = NULL;
 	FILE *f_inc = NULL;
+	FILE *f_hdr = NULL;
 
 	// SP013 special case where 8bpp data is split into upper and lower files
 	if (conv.depth == 8 && conv.data_format == DATA_FORMAT_SP013)
@@ -807,10 +591,24 @@ int main(int argc, char **argv)
 		ret = -1;
 		goto done;
 	}
+
+	snprintf(fname_buf, sizeof(fname_buf), "%s.h", conv.out);
+	f_hdr = fopen(fname_buf, "wb");
+	if (!f_hdr)
+	{
+		fprintf(stderr, "Couldn't open %s for writing\n", fname_buf);
+		ret = -1;
+		goto done;
+	}
 	fprintf(f_inc, "; ┌───────────────────────────────────────────────────┐\n");
 	fprintf(f_inc, "; │ This file was automatically generated by Velella. │\n");
 	fprintf(f_inc, "; └───────────────────────────────────────────────────┘\n");
 	fprintf(f_inc, "\n");
+	fprintf(f_hdr, "#pragma once\n");
+	fprintf(f_hdr, "// ┌───────────────────────────────────────────────────┐\n");
+	fprintf(f_hdr, "// │ This file was automatically generated by Velella. │\n");
+	fprintf(f_hdr, "// └───────────────────────────────────────────────────┘\n");
+	fprintf(f_hdr, "\n");
 
 	Entry *e = conv.entry_head;
 	int pal_offs = 0;
@@ -838,13 +636,15 @@ int main(int argc, char **argv)
 			pal_offs += e->pal_size * sizeof(uint16_t);
 		}
 
-		entry_emit_meta(e, &conv, f_inc, e->pal_block_offs);
+		entry_emit_meta(e, &conv, f_inc, e->pal_block_offs, false);
+		entry_emit_meta(e, &conv, f_hdr, e->pal_block_offs, true);
 		entry_emit_chr(e, &conv, f_chr1, f_chr2);
 
 		e = e->next;
 		if (e)
 		{
 			fprintf(f_inc, "; ──────────────────────────────────────────────────────────────────────────────\n");
+			fprintf(f_hdr, "// ─────────────────────────────────────────────────────────────────────────────\n");
 		}
 	}
 
@@ -853,6 +653,7 @@ done:
 	if (f_chr2) fclose(f_chr2);
 	if (f_pal) fclose(f_pal);
 	if (f_inc) fclose(f_inc);
+	if (f_hdr) fclose(f_hdr);
 	conv_shutdown(&conv);
 
 	// Close out data to files
