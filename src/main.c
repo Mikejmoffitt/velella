@@ -648,6 +648,24 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if (pal_offs > 0)
+	{
+		// Replace slashes in name with underscores to make palette name
+		char *sym_buf = malloc(strlen(conv.out)+1);
+		strcpy(sym_buf, conv.out);
+		char *sym_buf_walk = sym_buf;
+		while (*sym_buf_walk)
+		{
+			if (*sym_buf_walk == '/') *sym_buf_walk = '_';
+			sym_buf_walk++;
+		}
+
+		fprintf(f_hdr, "// Palette block forward declaration.\n");
+		fprintf(f_hdr, "extern const uint8_t %s_pal[0x%X];\n", sym_buf, pal_offs);
+
+		free(sym_buf);
+	}
+
 done:
 	if (f_chr1) fclose(f_chr1);
 	if (f_chr2) fclose(f_chr2);
