@@ -63,6 +63,9 @@ bool conv_validate(Conv *s)
 			fprintf(stderr, "[CONV] No data format specified!\n");
 			return false;
 
+		case DATA_FORMAT_DIRECT:
+			break;
+
 		case DATA_FORMAT_SP013:
 			if (frame_cfg->tilesize != 16)
 			{
@@ -94,9 +97,6 @@ bool conv_validate(Conv *s)
 				fprintf(stderr, "[CONV] bg038 supports 4bpp or 8bpp tiles.\n");
 				return false;
 			}
-			break;
-
-		case DATA_FORMAT_DIRECT:
 			break;
 
 		case DATA_FORMAT_CPS_SPR:
@@ -259,7 +259,7 @@ bool conv_entry_add(Conv *s)
 	//
 	switch (frame_cfg->data_format)
 	{
-		// Backgrond tiles set the tilesize and "frame" width this way in order
+		// Background tiles set the tilesize and "frame" width this way in order
 		// to support interleaved tile order; "tiles" become "frames" and the
 		// tile size is used as the unit that tiles are built from.
 		case DATA_FORMAT_BG038:
@@ -269,12 +269,6 @@ bool conv_entry_add(Conv *s)
 				frame_cfg->w = 16;
 				frame_cfg->h = 16;
 			}
-			break;
-
-		// Formats that only support 16px.
-		case DATA_FORMAT_SP013:
-		case DATA_FORMAT_CPS_SPR:
-			frame_cfg->tilesize = 16;
 			break;
 
 		default:
@@ -291,11 +285,14 @@ bool conv_entry_add(Conv *s)
 	const int frame_tiles_x = frame_cfg->w / frame_cfg->tilesize;
 	const int frame_tiles_y = frame_cfg->h / frame_cfg->tilesize;
 	e->code_per = frame_tiles_x * frame_tiles_y;
+
 	// Effective frame height by rounding down to tile count.
 	const int sw_adj = (frame_cfg->tilesize*frame_tiles_x);
 	const int sh_adj = (frame_cfg->tilesize*frame_tiles_y);
 
 	const bool yoko = ((frame_cfg->angle == 0) || (frame_cfg->angle == 180));
+
+	// Please see the notes in the convert function about CPS 8x8 tiles.
 
 	// Special format-specific stuff
 	switch (frame_cfg->data_format)
@@ -304,7 +301,25 @@ bool conv_entry_add(Conv *s)
 			e->sp013.size_code = yoko ? ((frame_tiles_x << 8) | frame_tiles_y) :
 			                            ((frame_tiles_y << 8) | frame_tiles_x);
 			break;
-		case DATA_FORMAT_BG038:
+
+		case DATA_FORMAT_CPS_BG:
+			// Special CPS 8x8 tile case: In order to make 8x8 tiles work, at emission
+			// time data is duplicated. As far as CPS is concerned, e->code_per is
+			// basically "how many 16x16 tiles". The padded 8x8 tile becomes the same
+			// as half a tile. So, an uneven width is forbidden, and code_per is then
+			// cut in half.
+			if (frame_cfg->tilesize == 8)
+			{
+				if (((frame_tiles_x) % 2) == 1)
+				{
+					fprintf(stderr, "[CONV] CPS 8x8 tiles must be sourced from a"
+					                "file with an even column count.\n");
+					free(png);
+					free(px);
+					return false;
+				}
+				e->code_per /= 2;
+			}
 			break;
 
 		default:
@@ -352,9 +367,6 @@ bool conv_entry_add(Conv *s)
 			{
 				case DATA_FORMAT_DIRECT:
 				case DATA_FORMAT_BG038:
-					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, frame_cfg->tilesize, frame_cfg->angle, chr_w);
-					break;
-
 				case DATA_FORMAT_CPS_SPR:
 				case DATA_FORMAT_CPS_BG:
 					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, frame_cfg->tilesize, frame_cfg->angle, chr_w);

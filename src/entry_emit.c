@@ -60,8 +60,6 @@ void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs
 
 		case DATA_FORMAT_CPS_SPR:
 			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
-			fprintf(f_inc, "%s%s_CODE_HI %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code >> 16);
-			fprintf(f_inc, "%s%s_CODE_LOW %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code & 0xFFFF);
 			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
 			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
@@ -71,6 +69,17 @@ void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs
 			fprintf(f_inc, "%s%s_SIZE %s%s%02X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (((frame_cfg->h/16)-1)<<4) | ((frame_cfg->w/16)-1));
 			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per);
 			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+			break;
+
+		case DATA_FORMAT_CPS_BG:
+			// The code is doubled for 8x8 tiles because they're basically internally padded due to the CPS architecture.
+			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*((e->frame_cfg.tilesize == 8) ? 2 : 1));
+//			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
+			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
+			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
+			fprintf(f_inc, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
+			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);  // whereas the "frame" is used to chop major tiles
+			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->w);
 			break;
 
 		default:
@@ -85,6 +94,14 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 	uint8_t *chr = e->chr;
 	switch (e->frame_cfg.data_format)
 	{
+		case DATA_FORMAT_DIRECT:
+			for (size_t i = 0; i < e->chr_bytes; i++)
+			{
+				const uint8_t px = *chr++;
+				fputc(px, f_chr);
+			}
+			break;
+
 		case DATA_FORMAT_SP013:
 			for (size_t i = 0; i < e->chr_bytes/2; i++)
 			{
@@ -118,6 +135,37 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 			}
 			break;
 
+		case DATA_FORMAT_CPS_BG:
+			if (e->frame_cfg.tilesize == 8)
+			{
+				// CPS-B only selects data from the "even" graphics for 8x8 tiles.
+				// Basically, we emit an 8x8 planar tile, followed by a blank tile.
+				for (size_t i = 0; i < e->chr_bytes/(8*8); i++)
+				{
+					for (size_t j = 0; j < 8; j++)
+					{
+						uint8_t even[4] = {0};
+						for (size_t k = 0; k < 8; k++)
+						{
+							for (int bit = 0; bit < 4; bit++)
+							{
+								even[bit] = even[bit] << 1;
+								even[bit] |= ((chr[(j*8)+k]   & (1<<bit)) ? 1 : 0);
+							}
+						}
+						for (int bit = 0; bit < 4; bit++) fputc(~even[bit], f_chr);
+						for (int bit = 0; bit < 4; bit++) fputc(~even[bit], f_chr);
+					}
+					chr += 8*8;
+				}
+				break;
+			}
+			else if (e->frame_cfg.tilesize == 32)
+			{
+				break;
+			}
+			__attribute__((fallthrough));
+
 		case DATA_FORMAT_CPS_SPR:
 			// spreads across 3-6, we have low 2bpp even tiles, low 2bpp odd tiles, high 2bpp even tiles, high 2bpp odd tiles
 			// 16x16 blocsk at a time, emitted as planar data.
@@ -148,17 +196,8 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 			}
 			break;
 
-		case DATA_FORMAT_DIRECT:
-			for (size_t i = 0; i < e->chr_bytes; i++)
-			{
-				const uint8_t px = *chr++;
-				fputc(px, f_chr);
-			}
-			break;
-
 		default:
 			break;
-
 	}
 }
 
