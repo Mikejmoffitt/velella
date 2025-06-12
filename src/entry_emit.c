@@ -6,8 +6,6 @@
 void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs, bool c_lang)
 {
 	const FrameCfg *frame_cfg = &e->frame_cfg;
-	printf("Entry $%03X \"%s\": %d x %d, %d frames/tiles\n",
-	       e->id, e->symbol, e->frame_cfg.w, e->frame_cfg.h, e->frames);
 
 	const char *k_str_comment = c_lang ? "//" : "; ";
 	const char *k_str_hex = c_lang ? "0x" : "$";
@@ -121,14 +119,32 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 			break;
 
 		case DATA_FORMAT_CPS_SPR:
-			for (size_t i = 0; i < e->chr_bytes/2; i++)
+			// spreads across 3-6, we have low 2bpp even tiles, low 2bpp odd tiles, high 2bpp even tiles, high 2bpp odd tiles
+			// 16x16 blocsk at a time, emitted as planar data.
+			// for every 16x16 sprite:
+//			printf("CHR bytes: %lu\n", e->chr_bytes);
+//			printf("16x16 tile count: %lu\n", e->chr_bytes/(16*16));
+			for (size_t i = 0; i < e->chr_bytes/(16*16); i++)
 			{
-				const uint8_t px0 = *chr++;
-				const uint8_t px1 = *chr++;
+				for (size_t j = 0; j < 16; j++)
+				{
+					uint8_t even[4] = {0};
+					uint8_t odd[4] = {0};
+					for (size_t k = 0; k < 8; k++)
+					{
+						for (int bit = 0; bit < 4; bit++)
+						{
+							even[bit] = even[bit] << 1;
+							odd[bit]  = odd[bit] << 1;
+							even[bit] |= ((chr[(j*16)+k]   & (1<<bit)) ? 1 : 0);
+							odd[bit]  |= ((chr[(j*16)+k+8] & (1<<bit)) ? 1 : 0);
+						}
+					}
 
-				const uint8_t lowbyte = ((px0 << 4) & 0xF0) | (px1 & 0x0F);
-
-				fputc(lowbyte, f_chr);
+					for (int bit = 0; bit < 4; bit++) fputc(even[bit], f_chr);
+					for (int bit = 0; bit < 4; bit++) fputc(odd[bit], f_chr);
+				}
+				chr += 16*16;
 			}
 			break;
 

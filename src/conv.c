@@ -79,22 +79,6 @@ bool conv_validate(Conv *s)
 			}
 			break;
 
-		case DATA_FORMAT_CPS_SPR:
-			if (frame_cfg->tilesize != 16)
-			{
-				fprintf(stderr, "[CONV] WARNING: Tilesize %dpx specified, but "
-				        "specified hardware only supports 16px.\n",
-				        frame_cfg->tilesize);
-				frame_cfg->tilesize = 16;
-			}
-
-			if (s->frame_cfg.depth != 4)
-			{
-				fprintf(stderr, "[CONV] CPS only supports 4bpp tile data.\n");
-				return false;
-			}
-			break;
-
 		case DATA_FORMAT_BG038:
 			// Limit to supported formats.
 			if (frame_cfg->tilesize != 8 && frame_cfg->tilesize != 16)
@@ -113,6 +97,35 @@ bool conv_validate(Conv *s)
 			break;
 
 		case DATA_FORMAT_DIRECT:
+			break;
+
+		case DATA_FORMAT_CPS_SPR:
+			if (frame_cfg->tilesize != 16)
+			{
+				fprintf(stderr, "[CONV] WARNING: Tilesize %dpx specified, but "
+				        "specified hardware only supports 16px.\n",
+				        frame_cfg->tilesize);
+				frame_cfg->tilesize = 16;
+			}
+
+			if (s->frame_cfg.depth != 4)
+			{
+				fprintf(stderr, "[CONV] CPS only supports 4bpp tile data.\n");
+				return false;
+			}
+			break;
+
+		case DATA_FORMAT_CPS_BG:
+			if (frame_cfg->tilesize != 8 && frame_cfg->tilesize != 16 && frame_cfg->tilesize != 32)
+			{
+				fprintf(stderr, "[CONV] Tilesize %dpx NG)", frame_cfg->tilesize);
+				return false;
+			}
+			if (s->frame_cfg.depth != 4)
+			{
+				fprintf(stderr, "[CONV] CPS only supports 4bpp tile data.\n");
+				return false;
+			}
 			break;
 
 		default:
@@ -339,9 +352,14 @@ bool conv_entry_add(Conv *s)
 			{
 				case DATA_FORMAT_DIRECT:
 				case DATA_FORMAT_BG038:
-				case DATA_FORMAT_CPS_SPR:
 					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, frame_cfg->tilesize, frame_cfg->angle, chr_w);
 					break;
+
+				case DATA_FORMAT_CPS_SPR:
+				case DATA_FORMAT_CPS_BG:
+					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, frame_cfg->tilesize, frame_cfg->angle, chr_w);
+					break;
+					
 				case DATA_FORMAT_SP013:
 					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, /*tilesize=*/0, frame_cfg->angle, chr_w);
 					break;

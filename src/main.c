@@ -149,6 +149,8 @@ int main(int argc, char **argv)
 	int pal_offs = 0;
 	while (e)
 	{
+		printf("Entry $%03X \"%s\": %d x %d, %d frames/tiles\n",
+		       e->id, e->symbol, e->frame_cfg.w, e->frame_cfg.h, e->frames);
 		entry_emit_pal(e, f_pal, &pal_offs);
 		entry_emit_meta(e, &conv, f_inc, e->pal_block_offs, false);
 		entry_emit_meta(e, &conv, f_hdr, e->pal_block_offs, true);
@@ -158,7 +160,7 @@ int main(int argc, char **argv)
 		if (e)
 		{
 			entry_emit_header_divider(f_inc, false);
-			entry_emit_header_divider(f_inc, true);
+			entry_emit_header_divider(f_hdr, true);
 		}
 	}
 

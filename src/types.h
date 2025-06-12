@@ -28,6 +28,7 @@ typedef enum DataFormat
 	DATA_FORMAT_BG038,       // Atlus 038 background tile data
 	DATA_FORMAT_DIRECT,      // Raw tile conversion.
 	DATA_FORMAT_CPS_SPR,     // CPS/CPS2 sprites.
+	DATA_FORMAT_CPS_BG,      // CPS/CPS2 background tiles.
 	DATA_FORMAT_COUNT
 } DataFormat;
 

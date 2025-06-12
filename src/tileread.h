@@ -81,10 +81,13 @@ static inline uint8_t *read_tile_px(const uint8_t *px_frame, int src_w, int tw, 
 static inline uint8_t *tile_read_frame(const uint8_t *px, int png_w, int png_x, int png_y, int sw_adj, int sh_adj, int tilesize, int angle, uint8_t *chr_w)
 {
 	const bool yoko = ((angle == 0) || (angle == 180));
-	const int tile_outer_count = (tilesize <= 0) ? 1 : ((yoko ? sw_adj : sh_adj)/tilesize);
-	const int tile_inner_count = (tilesize <= 0) ? 1 : ((yoko ? sh_adj : sw_adj)/tilesize);
 
-//	printf("read (%d, %d) size %d, %d (ts=%d)\n", png_x, png_y, sw_adj, sh_adj, tilesize);
+	const int tile_outer_count = (tilesize <= 0) ? 1 : (((yoko ? sh_adj : sw_adj)/tilesize));
+	const int tile_inner_count = (tilesize <= 0) ? 1 : (((yoko ? sw_adj : sh_adj)/tilesize));
+
+#ifdef TILEREAD_DEBUG_OUT
+	printf("read (%d, %d) size %d, %d (ts=%d) outer %d inner %d\n", png_x*sw_adj, png_y*sh_adj, sw_adj, sh_adj, tilesize, tile_outer_count, tile_inner_count);
+#endif  // TILEREAD_DEBUG_OUT
 
 	for (int tile_outer = 0; tile_outer < tile_outer_count; tile_outer++)
 	{
@@ -116,10 +119,16 @@ static inline uint8_t *tile_read_frame(const uint8_t *px, int png_w, int png_x, 
 					break;
 			}
 
-			const int base_idx = ((png_y * sh_adj) + (ty * tilesize)) * png_w + ((png_x * sw_adj) + (tx * tilesize));
+			const int src_y = ((png_y * sh_adj) + (ty * tilesize));
+			const int src_x = ((png_x * sw_adj) + (tx * tilesize));
+
+			const int base_idx = (src_y * png_w) + src_x;;
 			const uint8_t *px_frame = &px[base_idx];  // Top-left of frame.
 			const int clip_w = (tilesize <= 0) ? sw_adj : tilesize;
 			const int clip_h = (tilesize <= 0) ? sh_adj : tilesize;
+#ifdef TILEREAD_DEBUG_OUT
+			printf("  read idx %d, %d --> %d, %d\n", tx, ty, src_x, src_y);
+#endif  // TILEREAD_DEBUG_OUT
 			chr_w = read_tile_px(px_frame, png_w, clip_w, clip_h, angle, chr_w);
 		}
 	}
