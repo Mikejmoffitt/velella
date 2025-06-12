@@ -141,8 +141,8 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 						}
 					}
 
-					for (int bit = 0; bit < 4; bit++) fputc(even[bit], f_chr);
-					for (int bit = 0; bit < 4; bit++) fputc(odd[bit], f_chr);
+					for (int bit = 0; bit < 4; bit++) fputc(~even[bit], f_chr);
+					for (int bit = 0; bit < 4; bit++) fputc(~odd[bit], f_chr);
 				}
 				chr += 16*16;
 			}

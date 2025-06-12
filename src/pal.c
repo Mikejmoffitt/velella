@@ -63,13 +63,31 @@ uint16_t pal_pack_entry(PalFormat fmt, uint8_t r, uint8_t g, uint8_t b)
 
 void pal_pack_set(PalFormat fmt, const uint8_t *srcpal, uint16_t *destpal, size_t count)
 {
-	for (size_t i = 0; i < count; i++)
+	// On CPS, we invert the palette read order so we can pretend index 0 is
+	// the transparent key index.
+	switch (fmt)
 	{
-		const int offs = i * 4;
-		const uint8_t r = srcpal[offs + 0];
-		const uint8_t g = srcpal[offs + 1];
-		const uint8_t b = srcpal[offs + 2];
-		destpal[i] = pal_pack_entry(fmt, r, g, b);
+		case PAL_FORMAT_CPS:
+			for (size_t i = 0; i < count; i++)
+			{
+				const int idx_inner = i % 16;
+				const int offs = i * 4;
+				const uint8_t r = srcpal[offs + 0];
+				const uint8_t g = srcpal[offs + 1];
+				const uint8_t b = srcpal[offs + 2];
+				destpal[15 - idx_inner] = pal_pack_entry(fmt, r, g, b);
+			}
+			break;
+		default:
+			for (size_t i = 0; i < count; i++)
+			{
+				const int offs = i * 4;
+				const uint8_t r = srcpal[offs + 0];
+				const uint8_t g = srcpal[offs + 1];
+				const uint8_t b = srcpal[offs + 2];
+				destpal[i] = pal_pack_entry(fmt, r, g, b);
+			}
+			break;
 	}
 }
 
