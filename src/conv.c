@@ -27,7 +27,8 @@ static bool validate_angle(int angle)
 bool conv_init(Conv *s)
 {
 	memset(s, 0, sizeof(*s));
-	s->depth = DEPTH_DEFAULT;
+	s->frame_cfg.depth = DEPTH_DEFAULT;
+	s->frame_cfg.tilesize = TILESIZE_DEFAULT;
 	return true;
 }
 
@@ -50,46 +51,36 @@ bool conv_validate(Conv *s)
 	}
 
 	FrameCfg *frame_cfg = &s->frame_cfg;
-	if (s->depth != 4 && s->depth != 8)
-	{
-		fprintf(stderr, "[CONV] depth (%d) must be 4 or 8!\n", s->depth);
-		return false;
-	}
 	if (!validate_angle(frame_cfg->angle))
 	{
 		fprintf(stderr, "[CONV] angle %d NG\n", frame_cfg->angle);
 		return false;
 	}
 
-	switch (s->data_format)
+	switch (s->frame_cfg.data_format)
 	{
 		case DATA_FORMAT_UNSPECIFIED:
 			fprintf(stderr, "[CONV] No data format specified!\n");
 			return false;
 
 		case DATA_FORMAT_SP013:
-			// unspecified is ok.
-			if (frame_cfg->tilesize == 0)
-			{
-				frame_cfg->tilesize = 16;
-			}
-			// Point out mistaken sizes.
-			else if (frame_cfg->tilesize != 16)
+			if (frame_cfg->tilesize != 16)
 			{
 				fprintf(stderr, "[CONV] WARNING: Tilesize %dpx specified, but "
 				        "specified hardware only supports 16px.\n",
 				        frame_cfg->tilesize);
 				frame_cfg->tilesize = 16;
+			}
+
+			if (s->frame_cfg.depth != 4 && s->frame_cfg.depth != 8)
+			{
+				fprintf(stderr, "[CONV] sp013 supports 4bpp or 8bpp tiles.\n");
+				return false;
 			}
 			break;
 
 		case DATA_FORMAT_CPS_SPR:
-			if (frame_cfg->tilesize == 0)
-			{
-				frame_cfg->tilesize = 16;
-			}
-			// Point out mistaken sizes.
-			else if (frame_cfg->tilesize != 16)
+			if (frame_cfg->tilesize != 16)
 			{
 				fprintf(stderr, "[CONV] WARNING: Tilesize %dpx specified, but "
 				        "specified hardware only supports 16px.\n",
@@ -97,12 +88,12 @@ bool conv_validate(Conv *s)
 				frame_cfg->tilesize = 16;
 			}
 
-			if (s->depth != 4)
+			if (s->frame_cfg.depth != 4)
 			{
 				fprintf(stderr, "[CONV] CPS only supports 4bpp tile data.\n");
 				return false;
 			}
-
+			break;
 
 		case DATA_FORMAT_BG038:
 			// Limit to supported formats.
@@ -113,17 +104,23 @@ bool conv_validate(Conv *s)
 				         frame_cfg->tilesize);
 				return false;
 			}
+
+			if (s->frame_cfg.depth != 4 && s->frame_cfg.depth != 8)
+			{
+				fprintf(stderr, "[CONV] bg038 supports 4bpp or 8bpp tiles.\n");
+				return false;
+			}
 			break;
 
 		case DATA_FORMAT_DIRECT:
 			break;
 
 		default:
-			fprintf(stderr, "[CONV] Data format %d NG!\n", s->data_format);
+			fprintf(stderr, "[CONV] Data format %d NG!\n", frame_cfg->data_format);
 			break;
 	}
 
-	if (!pal_validate_selection(s->pal_format))
+	if (!pal_validate_selection(frame_cfg->pal_format))
 	{
 		fprintf(stderr, "[CONV] Palette format NG!\n");
 		return false;
@@ -169,6 +166,7 @@ bool conv_entry_add(Conv *s)
 		s->entry_tail = e;
 	}
 
+	// Symbols in the header are meant to be SCREAMING in all caps.
 	strncpy(e->symbol, s->symbol, sizeof(e->symbol));
 	for (int i = 0; i < strlen(s->symbol); i++)
 	{
@@ -211,7 +209,7 @@ bool conv_entry_add(Conv *s)
 	// Make native palette data (host endianness)
 	//
 	e->pal_size = state.info_png.color.palettesize;
-	pal_pack_set(s->pal_format, state.info_png.color.palette, e->pal, state.info_png.color.palettesize);
+	pal_pack_set(frame_cfg->pal_format, state.info_png.color.palette, e->pal, state.info_png.color.palettesize);
 	e->pal_ref = NULL;
 	
 	// See if another entry has the same palette, and get a reference to it if so.
@@ -246,7 +244,7 @@ bool conv_entry_add(Conv *s)
 	//
 	// Set size and sprite count information.
 	//
-	switch (s->data_format)
+	switch (frame_cfg->data_format)
 	{
 		// Backgrond tiles set the tilesize and "frame" width this way in order
 		// to support interleaved tile order; "tiles" become "frames" and the
@@ -287,7 +285,7 @@ bool conv_entry_add(Conv *s)
 	const bool yoko = ((frame_cfg->angle == 0) || (frame_cfg->angle == 180));
 
 	// Special format-specific stuff
-	switch (s->data_format)
+	switch (frame_cfg->data_format)
 	{
 		case DATA_FORMAT_SP013:
 			e->sp013.size_code = yoko ? ((frame_tiles_x << 8) | frame_tiles_y) :
@@ -337,7 +335,7 @@ bool conv_entry_add(Conv *s)
 			const int pngy = outer;
 			const int pngx = inner;
 
-			switch (s->data_format)
+			switch (frame_cfg->data_format)
 			{
 				case DATA_FORMAT_DIRECT:
 				case DATA_FORMAT_BG038:

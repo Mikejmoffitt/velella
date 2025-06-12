@@ -1,4 +1,5 @@
 #include "entry_emit.h"
+#include "format.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -14,13 +15,14 @@ void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs
 	const char *k_str_equ = c_lang ? "" : "= ";
 
 	// Write inc entry
-	fprintf(f_inc, "%s Entry $%03X \"%s\": %d x %d, %d frames/tiles\n",
+	fprintf(f_inc, "%s Entry $%03X \"%s\": format \"%s\" %d x %d, %d frames/tiles\n",
 	        k_str_comment, e->id, e->symbol,
+	        string_for_data_format(e->frame_cfg.data_format),
 	        frame_cfg->w, frame_cfg->h, e->frames);
 	fprintf(f_inc, "%s%s_PAL_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, pal_offs);
 	fprintf(f_inc, "%s%s_PAL_LEN %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->pal_size);
 
-	switch (conv->data_format)
+	switch (e->frame_cfg.data_format)
 	{
 		case DATA_FORMAT_SP013:
 			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
@@ -66,8 +68,9 @@ void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs
 			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
 			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
-			fprintf(f_inc, "%s%s_SX %s%s%d\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->w/16);
-			fprintf(f_inc, "%s%s_SY %s%s%d\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->h/16);
+			fprintf(f_inc, "%s%s_SX %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->w/16);
+			fprintf(f_inc, "%s%s_SY %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->h/16);
+			fprintf(f_inc, "%s%s_SIZE %s%s%02X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (((frame_cfg->h/16)-1)<<4) | ((frame_cfg->w/16)-1));
 			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per);
 			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
 			break;
@@ -78,11 +81,11 @@ void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs
 	fprintf(f_inc, "\n");
 }
 
-void entry_emit_chr(const Entry *e, const Conv *conv, FILE *f_chr1, FILE *f_chr2)
+void entry_emit_chr(const Entry *e, FILE *f_chr)
 {
 	// Dump CHR data into CHR file(s)
 	uint8_t *chr = e->chr;
-	switch (conv->data_format)
+	switch (e->frame_cfg.data_format)
 	{
 		case DATA_FORMAT_SP013:
 			for (size_t i = 0; i < e->chr_bytes/2; i++)
@@ -97,8 +100,8 @@ void entry_emit_chr(const Entry *e, const Conv *conv, FILE *f_chr1, FILE *f_chr2
 				const uint8_t lowbyte = ((px0 << 4) & 0xF0) | (px1 & 0x0F);
 				const uint8_t hibyte = (px0 & 0xF0) | ((px1 >> 4) & 0x0F);
 
-				fputc(lowbyte, f_chr1);
-				if (f_chr2) fputc(hibyte, f_chr2);  // TODO: good option for selecting plane split
+				fputc(lowbyte, f_chr);
+				if (e->frame_cfg.depth == 8) fputc(hibyte, f_chr);
 			}
 			break;
 
@@ -112,8 +115,8 @@ void entry_emit_chr(const Entry *e, const Conv *conv, FILE *f_chr1, FILE *f_chr2
 				const uint8_t hibyte = (px0 & 0xF0) | ((px1 >> 4) & 0x0F);
 
 				// Put main plane on low bytes, upper 4bpp on even bytes
-				fputc(lowbyte, f_chr1);
-				if (conv->depth == 8) fputc(hibyte, f_chr1);
+				fputc(lowbyte, f_chr);
+				if (e->frame_cfg.depth == 8) fputc(hibyte, f_chr);
 			}
 			break;
 
@@ -125,8 +128,7 @@ void entry_emit_chr(const Entry *e, const Conv *conv, FILE *f_chr1, FILE *f_chr2
 
 				const uint8_t lowbyte = ((px0 << 4) & 0xF0) | (px1 & 0x0F);
 
-				// Put main plane on low bytes, upper 4bpp on even bytes
-				fputc(lowbyte, f_chr1);
+				fputc(lowbyte, f_chr);
 			}
 			break;
 
@@ -134,7 +136,7 @@ void entry_emit_chr(const Entry *e, const Conv *conv, FILE *f_chr1, FILE *f_chr2
 			for (size_t i = 0; i < e->chr_bytes; i++)
 			{
 				const uint8_t px = *chr++;
-				fputc(px, f_chr1);
+				fputc(px, f_chr);
 			}
 			break;
 

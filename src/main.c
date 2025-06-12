@@ -74,9 +74,6 @@
 // h = 16
 // src = sprite.png
 
-
-
-
 int main(int argc, char **argv)
 {
 	int ret = -1;
@@ -104,43 +101,18 @@ int main(int argc, char **argv)
 	// Now emit a pile of CHR data
 	char fname_buf[512];
 
-	FILE *f_chr1 = NULL;
-	FILE *f_chr2 = NULL;
+	FILE *f_chr = NULL;
 	FILE *f_pal = NULL;
 	FILE *f_inc = NULL;
 	FILE *f_hdr = NULL;
 
-	// SP013 special case where 8bpp data is split into upper and lower files
-	if (conv.depth == 8 && conv.data_format == DATA_FORMAT_SP013)
+	snprintf(fname_buf, sizeof(fname_buf), "%s.chr", conv.out);
+	f_chr = fopen(fname_buf, "wb");
+	if (!f_chr)
 	{
-		snprintf(fname_buf, sizeof(fname_buf), "%s.ch1", conv.out);
-		f_chr1 = fopen(fname_buf, "wb");
-		if (!f_chr1)
-		{
-			fprintf(stderr, "Couldn't open %s for writing\n", fname_buf);
-			ret = -1;
-			goto done;
-		}
-
-		snprintf(fname_buf, sizeof(fname_buf), "%s.ch2", conv.out);
-		f_chr2 = fopen(fname_buf, "wb");
-		if (!f_chr2)
-		{
-			fprintf(stderr, "Couldn't open %s for writing\n", fname_buf);
-			ret = -1;
-			goto done;
-		}
-	}
-	else
-	{
-		snprintf(fname_buf, sizeof(fname_buf), "%s.chr", conv.out);
-		f_chr1 = fopen(fname_buf, "wb");
-		if (!f_chr1)
-		{
-			fprintf(stderr, "Couldn't open %s for writing\n", fname_buf);
-			ret = -1;
-			goto done;
-		}
+		fprintf(stderr, "Couldn't open %s for writing\n", fname_buf);
+		ret = -1;
+		goto done;
 	}
 
 	snprintf(fname_buf, sizeof(fname_buf), "%s.pal", conv.out);
@@ -180,7 +152,7 @@ int main(int argc, char **argv)
 		entry_emit_pal(e, f_pal, &pal_offs);
 		entry_emit_meta(e, &conv, f_inc, e->pal_block_offs, false);
 		entry_emit_meta(e, &conv, f_hdr, e->pal_block_offs, true);
-		entry_emit_chr(e, &conv, f_chr1, f_chr2);
+		entry_emit_chr(e, f_chr);
 
 		e = e->next;
 		if (e)
@@ -193,8 +165,7 @@ int main(int argc, char **argv)
 	entry_emit_header_pal_decl(f_hdr, pal_offs, conv.out, true);
 
 done:
-	if (f_chr1) fclose(f_chr1);
-	if (f_chr2) fclose(f_chr2);
+	if (f_chr) fclose(f_chr);
 	if (f_pal) fclose(f_pal);
 	if (f_inc) fclose(f_inc);
 	if (f_hdr) fclose(f_hdr);

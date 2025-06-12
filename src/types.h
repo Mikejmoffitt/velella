@@ -48,6 +48,10 @@ typedef struct FrameCfg
 	int angle;                 // Rotation of the frame.
 	uint32_t code;             // Starting code in graphics memory.
 	int tilesize;              // Size of one tile.
+	int depth;                 // Bits per pixel.
+	PalFormat pal_format;
+	DataFormat data_format;
+	
 } FrameCfg;
 
 typedef struct Entry Entry;
@@ -90,9 +94,6 @@ typedef struct Conv
 
 	// Meta config
 	char out[256];           // Output base filename.
-	DataFormat data_format;  // Arrangement of data.
-	PalFormat pal_format;
-	int depth;             // Bits per pixel.
 
 	// Config state from ini for next entry
 	char src[256];           // Source image filename.

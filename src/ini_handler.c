@@ -19,7 +19,7 @@ int ini_handler_func(void *user, const char *section, const char *name, const ch
 		s->symbol[sizeof(s->symbol)-1] = '\0';
 	}
 
-	// parameter settings
+	// Setting the source is what actually kicks off the conversion for this entry.
 	if (strcmp("src", name) == 0)
 	{
 		strncpy(s->src, value, sizeof(s->src));
@@ -41,7 +41,7 @@ int ini_handler_func(void *user, const char *section, const char *name, const ch
 	}
 	else if (strcmp("depth", name) == 0)
 	{
-		s->depth = strtoul(value, NULL, 0);
+		s->frame_cfg.depth = strtoul(value, NULL, 0);
 	}
 	else if (strcmp("w", name) == 0)
 	{
@@ -57,8 +57,8 @@ int ini_handler_func(void *user, const char *section, const char *name, const ch
 	}
 	else if (strcmp("format", name) == 0)
 	{
-		s->data_format = data_format_for_string(value);
-		if (s->data_format == DATA_FORMAT_UNSPECIFIED)
+		s->frame_cfg.data_format = data_format_for_string(value);
+		if (s->frame_cfg.data_format == DATA_FORMAT_UNSPECIFIED)
 		{
 			printf("ERROR: Unhandled data format %s\n", value);
 			return 0;
@@ -66,8 +66,8 @@ int ini_handler_func(void *user, const char *section, const char *name, const ch
 	}
 	else if (strcmp("pal", name) == 0)
 	{
-		s->pal_format = pal_format_for_string(value);
-		if (s->pal_format == PAL_FORMAT_UNSPECIFIED)
+		s->frame_cfg.pal_format = pal_format_for_string(value);
+		if (s->frame_cfg.pal_format == PAL_FORMAT_UNSPECIFIED)
 		{
 			printf("ERROR: Unhandled palette format %s\n", value);
 			return 0;
