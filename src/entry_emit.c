@@ -64,9 +64,7 @@ void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs
 			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
 			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
-			fprintf(f_inc, "%s%s_SX %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->w/16);
-			fprintf(f_inc, "%s%s_SY %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->h/16);
-			fprintf(f_inc, "%s%s_SIZE %s%s%02X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (((frame_cfg->h/16)-1)<<4) | ((frame_cfg->w/16)-1));
+			fprintf(f_inc, "%s%s_SIZE %s%s%02X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->cps_spr.size_code);
 			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per);
 			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
 			break;
@@ -74,7 +72,6 @@ void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs
 		case DATA_FORMAT_CPS_BG:
 			// The code is doubled for 8x8 tiles because they're basically internally padded due to the CPS architecture.
 			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*((e->frame_cfg.tilesize == 8) ? 2 : 1));
-//			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
 			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
 			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
@@ -231,6 +228,7 @@ void entry_emit_header_top(FILE *f, bool c_lang)
 	if (c_lang)
 	{
 		fprintf(f, "#pragma once\n");
+		fprintf(f, "#include <stdint.h>\n");
 		fprintf(f, "\n");
 	}
 	const char *str_comment = c_lang ? "//" : ";";
@@ -267,5 +265,35 @@ void entry_emit_header_pal_decl(FILE *f, int pal_offs, const char *sym_name, boo
 		}
 
 		free(sym_buf);
+	}
+}
+
+// Type declarations
+void entry_emit_type_decl(FILE *f, DataFormat fmt, bool c_lang)
+{
+	switch (fmt)
+	{
+		case DATA_FORMAT_CPS_SPR:
+			if (c_lang)
+			{
+				fprintf(f, "#ifndef __ASSEMBLER__\n");
+				fprintf(f, "typedef struct VelCpsObj\n"
+				           "{\n"
+				           "\tuint16_t code;  // Tile code\n"
+				           "\tuint16_t size;  // Size attribute bits\n"
+				           "\tuint8_t ts[0];  // Variable bitfield of tiles to skip indexed by row.\n"
+				           "} VelCpsObj;\n");
+				fprintf(f, "#else\n");
+				fprintf(f, "\t.struct\t0\n"
+				           "VelCpsObj.code: ds.w 1  // Tile code\n"
+				           "VelCpsObj.size: ds.w 1  // Size attribute bits\n"
+				           "VelCpsObj.ts:           // Variable bitfield of tiles to skip indexed by row.\n"
+				           "\n");
+				fprintf(f, "#endif // __ASSEMBLER__\n");
+			}
+			break;
+
+		default:
+			break;
 	}
 }

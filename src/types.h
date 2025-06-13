@@ -29,6 +29,7 @@ typedef enum DataFormat
 	DATA_FORMAT_BG038,       // Atlus 038 background tile data
 	DATA_FORMAT_CPS_SPR,     // CPS/CPS2 sprites.
 	DATA_FORMAT_CPS_BG,      // CPS/CPS2 background tiles.
+	
 	DATA_FORMAT_COUNT
 } DataFormat;
 
@@ -79,10 +80,17 @@ struct Entry
 	{
 		uint16_t size_code;
 	} sp013;
+	struct
+	{
+		uint16_t size_code;
+	} cps_spr;
 
 	// The bitmap data.
 	uint8_t *chr;
 	size_t chr_bytes;
+
+	// Mapping.
+	int mapping_offs;
 };
 
 // State for the conversion process.

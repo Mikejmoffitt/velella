@@ -78,7 +78,15 @@ static inline uint8_t *read_tile_px(const uint8_t *px_frame, int src_w, int tw, 
 	return chr_w;
 }
 
-static inline uint8_t *tile_read_frame(const uint8_t *px, int png_w, int png_x, int png_y, int sw_adj, int sh_adj, int tilesize, int angle, uint8_t *chr_w)
+// TODO: for CPS SPR, add a tile skip bool.
+//       also consider a separate usage counting function, or let this write back to a tile skip array.
+//       and, if chr_w is NULL, run as a read-only test run for tile counting.
+static inline uint8_t *tile_read_frame(const uint8_t *px,
+                                       int png_w, int png_x, int png_y,
+                                       int sw_adj, int sh_adj,
+                                       int tilesize,
+                                       int angle,
+                                       uint8_t *chr_w)  // CHR data to write to.
 {
 	const bool yoko = ((angle == 0) || (angle == 180));
 

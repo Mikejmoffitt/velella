@@ -13,4 +13,9 @@ void entry_emit_pal(Entry *e, FILE *f_pal, int *pal_offs);
 
 void entry_emit_header_top(FILE *f, bool c_lang);
 void entry_emit_header_divider(FILE *f, bool c_lang);
+
+// Type declarations
+void entry_emit_type_decl(FILE *f, DataFormat fmt, bool c_lang);
+
+// Palette declarations
 void entry_emit_header_pal_decl(FILE *f, int pal_offs, const char *sym_name, bool c_lang);

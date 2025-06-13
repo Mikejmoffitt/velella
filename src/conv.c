@@ -298,8 +298,13 @@ bool conv_entry_add(Conv *s)
 	switch (frame_cfg->data_format)
 	{
 		case DATA_FORMAT_SP013:
-			e->sp013.size_code = yoko ? ((frame_tiles_x << 8) | frame_tiles_y) :
-			                            ((frame_tiles_y << 8) | frame_tiles_x);
+			e->sp013.size_code = yoko ? ((frame_tiles_x << 8) | frame_tiles_y)
+			                          : ((frame_tiles_y << 8) | frame_tiles_x);
+			break;
+
+		case DATA_FORMAT_CPS_SPR:
+			e->cps_spr.size_code = yoko ? ((frame_tiles_y-1)<<4) | (frame_tiles_x-1)
+			                            : ((frame_tiles_x-1)<<4) | (frame_tiles_y-1);
 			break;
 
 		case DATA_FORMAT_CPS_BG:
@@ -333,6 +338,9 @@ bool conv_entry_add(Conv *s)
 	// sprite quantities within the sheet
 	const int frame_count_x = png_w / sw_adj;
 	const int frame_count_y = png_h / sh_adj;
+
+	// TODO: For CPS, iterate through the image, create a bitmap of tile skips,
+	// and get the actual used chr size before allocating.
 
 	const int chr_bytes_per = sw_adj * sh_adj;
 	e->chr_bytes = (frame_count_x * frame_count_y) * chr_bytes_per;
@@ -369,6 +377,7 @@ bool conv_entry_add(Conv *s)
 				case DATA_FORMAT_BG038:
 				case DATA_FORMAT_CPS_SPR:
 				case DATA_FORMAT_CPS_BG:
+					// TODO: For CPS SPR, pass in a tile skip flag.
 					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, frame_cfg->tilesize, frame_cfg->angle, chr_w);
 					break;
 					

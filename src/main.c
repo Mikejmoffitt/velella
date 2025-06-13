@@ -101,10 +101,11 @@ int main(int argc, char **argv)
 	// Now emit a pile of CHR data
 	char fname_buf[512];
 
-	FILE *f_chr = NULL;
-	FILE *f_pal = NULL;
-	FILE *f_inc = NULL;
-	FILE *f_hdr = NULL;
+	FILE *f_chr = NULL;  // CHR rom data
+	FILE *f_pal = NULL;  // Palette data
+	FILE *f_map = NULL;  // Mapping data
+	FILE *f_inc = NULL;  // Macro Assembler AS header / inc
+	FILE *f_hdr = NULL;  // GNU AS assembly / GCC C header
 
 	snprintf(fname_buf, sizeof(fname_buf), "%s.chr", conv.out);
 	f_chr = fopen(fname_buf, "wb");
@@ -118,6 +119,15 @@ int main(int argc, char **argv)
 	snprintf(fname_buf, sizeof(fname_buf), "%s.pal", conv.out);
 	f_pal = fopen(fname_buf, "wb");
 	if (!f_pal)
+	{
+		fprintf(stderr, "Couldn't open %s for writing\n", fname_buf);
+		ret = -1;
+		goto done;
+	}
+
+	snprintf(fname_buf, sizeof(fname_buf), "%s.", conv.out);
+	f_map = fopen(fname_buf, "wb");
+	if (!f_map)
 	{
 		fprintf(stderr, "Couldn't open %s for writing\n", fname_buf);
 		ret = -1;
@@ -145,6 +155,8 @@ int main(int argc, char **argv)
 	entry_emit_header_top(f_inc, false);
 	entry_emit_header_top(f_hdr, true);
 
+	bool formats_used[DATA_FORMAT_COUNT] = {false};
+
 	Entry *e = conv.entry_head;
 	int pal_offs = 0;
 	while (e)
@@ -156,6 +168,8 @@ int main(int argc, char **argv)
 		entry_emit_meta(e, &conv, f_hdr, e->pal_block_offs, true);
 		entry_emit_chr(e, f_chr);
 
+		formats_used[e->frame_cfg.data_format] = true;
+
 		e = e->next;
 		if (e)
 		{
@@ -164,11 +178,21 @@ int main(int argc, char **argv)
 		}
 	}
 
+	// Emit declarations for types relevant to this format
+	for (DataFormat fmt = 0; fmt < DATA_FORMAT_COUNT; fmt++)
+	{
+		if (!formats_used[fmt]) continue;
+		
+		entry_emit_type_decl(f_inc, fmt, false);
+		entry_emit_type_decl(f_hdr, fmt, true);
+	}
+
 	entry_emit_header_pal_decl(f_hdr, pal_offs, conv.out, true);
 
 done:
 	if (f_chr) fclose(f_chr);
 	if (f_pal) fclose(f_pal);
+	if (f_map) fclose(f_map);
 	if (f_inc) fclose(f_inc);
 	if (f_hdr) fclose(f_hdr);
 	conv_shutdown(&conv);
