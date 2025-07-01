@@ -128,6 +128,15 @@ bool conv_validate(Conv *s)
 			}
 			break;
 
+		case DATA_FORMAT_MD_SPR:
+		case DATA_FORMAT_MD_BG:
+			if (s->frame_cfg.depth != 4)
+			{
+				fprintf(stderr, "[CONV] MD only supports 4bpp tile data.\n");
+				return false;
+			}
+			break;
+
 		default:
 			fprintf(stderr, "[CONV] Data format %d NG!\n", frame_cfg->data_format);
 			break;
@@ -271,6 +280,15 @@ bool conv_entry_add(Conv *s)
 			}
 			break;
 
+		case DATA_FORMAT_MD_SPR:
+		case DATA_FORMAT_MD_BG:
+			frame_cfg->tilesize = 8;
+			if (frame_cfg->w < 8) frame_cfg->w = 8;
+			else if (frame_cfg->w > 32) frame_cfg->w = 32;
+			if (frame_cfg->h < 8) frame_cfg->h = 8;
+			else if (frame_cfg->h > 32) frame_cfg->h = 32;
+			break;
+
 		default:
 			break;
 	}
@@ -317,7 +335,7 @@ bool conv_entry_add(Conv *s)
 			{
 				if (((frame_tiles_x) % 2) == 1)
 				{
-					fprintf(stderr, "[CONV] CPS 8x8 tiles must be sourced from a"
+					fprintf(stderr, "[CONV] CPS 8x8 tiles must be sourced from a "
 					                "file with an even column count.\n");
 					free(png);
 					free(px);
@@ -325,6 +343,12 @@ bool conv_entry_add(Conv *s)
 				}
 				e->code_per /= 2;
 			}
+			break;
+
+		case DATA_FORMAT_MD_SPR:
+			e->md_spr.size_code = yoko ? ((frame_tiles_x-1)<<2) | (frame_tiles_y-1)
+			                           : ((frame_tiles_y-1)<<2) | (frame_tiles_x-1);
+
 			break;
 
 		default:
@@ -375,14 +399,18 @@ bool conv_entry_add(Conv *s)
 			{
 				case DATA_FORMAT_DIRECT:
 				case DATA_FORMAT_BG038:
-				case DATA_FORMAT_CPS_SPR:
+				case DATA_FORMAT_CPS_SPR:  // TODO: For CPS SPR, pass in a tile skip flag.
 				case DATA_FORMAT_CPS_BG:
-					// TODO: For CPS SPR, pass in a tile skip flag.
-					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, frame_cfg->tilesize, frame_cfg->angle, chr_w);
+				case DATA_FORMAT_MD_BG:
+					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, frame_cfg->tilesize, frame_cfg->angle, 0, chr_w);
 					break;
 					
 				case DATA_FORMAT_SP013:
-					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, /*tilesize=*/0, frame_cfg->angle, chr_w);
+					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, /*tilesize=*/0, frame_cfg->angle, 0,  chr_w);
+					break;
+
+				case DATA_FORMAT_MD_SPR:
+					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, frame_cfg->tilesize, frame_cfg->angle, TILE_READ_FLAG_X_MAJOR, chr_w);
 					break;
 				default:
 					break;

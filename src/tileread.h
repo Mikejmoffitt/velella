@@ -4,7 +4,12 @@
 #include <stdint.h>
 #include <stdio.h>
 
-static inline uint8_t *tile_read_frame(const uint8_t *px, int png_w, int png_x, int png_y, int sw_adj, int sh_adj, int tilesize, int angle, uint8_t *chr_w);
+enum
+{
+	TILE_READ_FLAG_X_MAJOR = 0x0001,
+};
+
+static inline uint8_t *tile_read_frame(const uint8_t *px, int png_w, int png_x, int png_y, int sw_adj, int sh_adj, int tilesize, int angle, uint32_t flags, uint8_t *chr_w);
 
 
 
@@ -86,12 +91,16 @@ static inline uint8_t *tile_read_frame(const uint8_t *px,
                                        int sw_adj, int sh_adj,
                                        int tilesize,
                                        int angle,
-                                       uint8_t *chr_w)  // CHR data to write to.
+                                       uint32_t flags,
+                                       uint8_t *chr_w)
 {
 	const bool yoko = ((angle == 0) || (angle == 180));
 
-	const int tile_outer_count = (tilesize <= 0) ? 1 : (((yoko ? sh_adj : sw_adj)/tilesize));
-	const int tile_inner_count = (tilesize <= 0) ? 1 : (((yoko ? sw_adj : sh_adj)/tilesize));
+	const bool x_major = (flags & TILE_READ_FLAG_X_MAJOR) ? true : false;
+	const bool y_major = (yoko && !x_major) || (!yoko && !x_major);
+
+	const int tile_outer_count = (tilesize <= 0) ? 1 : (((y_major ? sh_adj : sw_adj)/tilesize));
+	const int tile_inner_count = (tilesize <= 0) ? 1 : (((y_major ? sw_adj : sh_adj)/tilesize));
 
 #ifdef TILEREAD_DEBUG_OUT
 	printf("read (%d, %d) size %d, %d (ts=%d) outer %d inner %d\n", png_x*sw_adj, png_y*sh_adj, sw_adj, sh_adj, tilesize, tile_outer_count, tile_inner_count);
@@ -102,29 +111,59 @@ static inline uint8_t *tile_read_frame(const uint8_t *px,
 		for (int tile_inner = 0; tile_inner < tile_inner_count; tile_inner++)
 		{
 			int tx, ty;
-			switch (angle)
+			if (y_major)
 			{
-				default:
+				switch (angle)
+				{
+					default:
 
-				case 0:
-					ty = tile_outer;
-					tx = tile_inner;
-					break;
+					case 0:
+						ty = tile_outer;
+						tx = tile_inner;
+						break;
 
-				case 90:
-					tx = tile_inner_count - 1 - tile_inner;
-					ty = tile_inner;
-					break;
+					case 90:
+						tx = tile_inner_count - 1 - tile_inner;
+						ty = tile_inner;
+						break;
 
-				case 180:
-					ty = tile_outer_count - 1 - tile_outer;
-					tx = tile_inner_count - 1 - tile_inner;
-					break;
+					case 180:
+						ty = tile_outer_count - 1 - tile_outer;
+						tx = tile_inner_count - 1 - tile_inner;
+						break;
 
-				case 270:
-					tx = tile_outer;
-					ty = tile_inner_count - 1 - tile_inner;
-					break;
+					case 270:
+						tx = tile_outer;
+						ty = tile_inner_count - 1 - tile_inner;
+						break;
+				}
+			}
+			else
+			{
+				switch (angle)
+				{
+					default:
+
+					case 0:
+						ty = tile_inner;
+						tx = tile_outer;
+						break;
+
+					case 90:
+						tx = tile_outer_count - 1 - tile_outer;
+						ty = tile_outer;
+						break;
+
+					case 180:
+						ty = tile_inner_count - 1 - tile_inner;
+						tx = tile_outer_count - 1 - tile_outer;
+						break;
+
+					case 270:
+						tx = tile_inner;
+						ty = tile_outer_count - 1 - tile_outer;
+						break;
+				}
 			}
 
 			const int src_y = ((png_y * sh_adj) + (ty * tilesize));

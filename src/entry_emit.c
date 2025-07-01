@@ -79,6 +79,32 @@ void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs
 			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->w);
 			break;
 
+		case DATA_FORMAT_MD_SPR:
+			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*32);
+			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per*32*e->frames);
+			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per*32*e->frames/2);
+			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
+			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
+			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
+			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
+			fprintf(f_inc, "%s%s_SIZE %s%s%02X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->md_spr.size_code);
+			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per);
+			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+			break;
+
+		case DATA_FORMAT_MD_BG:
+			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*32);
+			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per*32*e->frames);
+			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per*32*e->frames/2);
+			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
+			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
+			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
+			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
+			fprintf(f_inc, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
+			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);  // whereas the "frame" is used to chop major tiles
+			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->w);
+			break;
+
 		default:
 			break;
 	}
@@ -193,6 +219,21 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 			}
 			break;
 
+		case DATA_FORMAT_MD_SPR:
+		case DATA_FORMAT_MD_BG:
+			for (size_t i = 0; i < e->chr_bytes/2; i++)
+			{
+				const uint8_t px0 = *chr++;
+				const uint8_t px1 = *chr++;
+
+				const uint8_t lowbyte = ((px0 << 4) & 0xF0) | (px1 & 0x0F);
+
+				fputc(lowbyte, f_chr);
+			}
+			break;
+
+			break;
+
 		default:
 			break;
 	}
@@ -228,7 +269,9 @@ void entry_emit_header_top(FILE *f, bool c_lang)
 	if (c_lang)
 	{
 		fprintf(f, "#pragma once\n");
+		fprintf(f, "#ifndef __ASSEMBLER__\n");
 		fprintf(f, "#include <stdint.h>\n");
+		fprintf(f, "#endif  // __ASSEMBLER__\n");
 		fprintf(f, "\n");
 	}
 	const char *str_comment = c_lang ? "//" : ";";
@@ -244,24 +287,34 @@ void entry_emit_header_divider(FILE *f, bool c_lang)
 	fprintf(f, "%s ─────────────────────────────────────────────────────\n", str_comment);
 }
 
+// Replace slashes in name with underscores
+char *sym_underscore_conversion(const char *sym_name)
+{
+	char *sym_buf = malloc(strlen(sym_name)+1);
+	strcpy(sym_buf, sym_name);
+	char *sym_buf_walk = sym_buf;
+	while (*sym_buf_walk)
+	{
+		if (*sym_buf_walk == '/') *sym_buf_walk = '_';
+		sym_buf_walk++;
+	}
+	return sym_buf;
+}
+
 void entry_emit_header_pal_decl(FILE *f, int pal_offs, const char *sym_name, bool c_lang)
 {
 	if (pal_offs > 0)
 	{
-		// Replace slashes in name with underscores to make palette name
-		char *sym_buf = malloc(strlen(sym_name)+1);
-		strcpy(sym_buf, sym_name);
-		char *sym_buf_walk = sym_buf;
-		while (*sym_buf_walk)
-		{
-			if (*sym_buf_walk == '/') *sym_buf_walk = '_';
-			sym_buf_walk++;
-		}
+		char *sym_buf = sym_underscore_conversion(sym_name);
 
 		if (c_lang)
 		{
 			fprintf(f, "// Palette block forward declaration.\n");
+			fprintf(f, "#ifndef __ASSEMBLER__\n");
 			fprintf(f, "extern const uint8_t %s_pal[0x%X];\n", sym_buf, pal_offs);
+			fprintf(f, "#else\n");
+			fprintf(f, "\t.extern\t%s_pal\n", sym_buf);
+			fprintf(f, "#endif  // __ASSEMBLER__\n");
 		}
 
 		free(sym_buf);
@@ -296,4 +349,16 @@ void entry_emit_type_decl(FILE *f, DataFormat fmt, bool c_lang)
 		default:
 			break;
 	}
+}
+
+void entry_emit_header_chr_size(FILE *f, const char *sym_name, size_t bytes)
+{
+	char *sym_buf = sym_underscore_conversion(sym_name);
+	fprintf(f, "// Character data block forward declaration.\n");
+	fprintf(f, "#ifndef __ASSEMBLER__\n");
+	fprintf(f, "extern const uint8_t %s_chr[0x%lX];\n", sym_buf, bytes);
+	fprintf(f, "#else\n");
+	fprintf(f, "\t.extern\t%s_chr\n", sym_buf);
+	fprintf(f, "#endif  // __ASSEMBLER__\n");
+	free(sym_buf);
 }

@@ -3,35 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-
-//
-// Palette formats.
-//
-typedef enum PalFormat
-{
-	PAL_FORMAT_UNSPECIFIED,
-	PAL_FORMAT_ATLUS,
-	PAL_FORMAT_X68000,
-	PAL_FORMAT_MD,  // Packs things for MD/C2; uses extra precision bits.
-	PAL_FORMAT_CPS,  // Fade channel left at $F.
-
-	PAL_FORMAT_COUNT
-} PalFormat;
-
-//
-// Pixel data formats.
-//
-typedef enum DataFormat
-{
-	DATA_FORMAT_UNSPECIFIED,
-	DATA_FORMAT_DIRECT,      // Raw tile conversion.
-	DATA_FORMAT_SP013,       // Atlus 013 sprite data
-	DATA_FORMAT_BG038,       // Atlus 038 background tile data
-	DATA_FORMAT_CPS_SPR,     // CPS/CPS2 sprites.
-	DATA_FORMAT_CPS_BG,      // CPS/CPS2 background tiles.
-	
-	DATA_FORMAT_COUNT
-} DataFormat;
+#include "format.h"
+#include "pal.h"
 
 //
 // Conversion entry data.
@@ -84,6 +57,10 @@ struct Entry
 	{
 		uint16_t size_code;
 	} cps_spr;
+	struct
+	{
+		uint16_t size_code;
+	} md_spr;
 
 	// The bitmap data.
 	uint8_t *chr;

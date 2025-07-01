@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 		goto done;
 	}
 
-	snprintf(fname_buf, sizeof(fname_buf), "%s.", conv.out);
+	snprintf(fname_buf, sizeof(fname_buf), "%s.map", conv.out);
 	f_map = fopen(fname_buf, "wb");
 	if (!f_map)
 	{
@@ -188,6 +188,7 @@ int main(int argc, char **argv)
 	}
 
 	entry_emit_header_pal_decl(f_hdr, pal_offs, conv.out, true);
+	entry_emit_header_chr_size(f_hdr, conv.out, ftell(f_chr));
 
 done:
 	if (f_chr) fclose(f_chr);

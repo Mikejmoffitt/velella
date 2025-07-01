@@ -19,3 +19,5 @@ void entry_emit_type_decl(FILE *f, DataFormat fmt, bool c_lang);
 
 // Palette declarations
 void entry_emit_header_pal_decl(FILE *f, int pal_offs, const char *sym_name, bool c_lang);
+
+void entry_emit_header_chr_size(FILE *f, const char *sym_name, size_t bytes);
