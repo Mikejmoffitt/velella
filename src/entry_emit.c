@@ -2,8 +2,10 @@
 #include "format.h"
 #include <stdlib.h>
 #include <string.h>
+#include "endian.h"
+#include "mdcsp_mapping.h"
 
-void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs, bool c_lang)
+void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 {
 	const FrameCfg *frame_cfg = &e->frame_cfg;
 
@@ -80,9 +82,10 @@ void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs
 			break;
 
 		case DATA_FORMAT_MD_SPR:
-			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*32);
-			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per*32*e->frames);
-			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per*32*e->frames/2);
+			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
+			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
+			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
+			fprintf(f_inc, "%s%s_MAP_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->map_offs);
 			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
 			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
@@ -93,9 +96,9 @@ void entry_emit_meta(const Entry *e, const Conv *conv, FILE *f_inc, int pal_offs
 			break;
 
 		case DATA_FORMAT_MD_BG:
-			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*32);
-			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per*32*e->frames);
-			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per*32*e->frames/2);
+			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
+			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
+			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
 			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
 			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
@@ -221,6 +224,7 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 
 		case DATA_FORMAT_MD_SPR:
 		case DATA_FORMAT_MD_BG:
+		case DATA_FORMAT_MD_CSP:
 			for (size_t i = 0; i < e->chr_bytes/2; i++)
 			{
 				const uint8_t px0 = *chr++;
@@ -230,8 +234,6 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 
 				fputc(lowbyte, f_chr);
 			}
-			break;
-
 			break;
 
 		default:
@@ -255,10 +257,7 @@ void entry_emit_pal(Entry *e, FILE *f_pal, int *pal_offs)
 		e->pal_block_offs = *pal_offs;
 		for (int i = 0; i < e->pal_size; i++)
 		{
-			const uint8_t upper = e->pal[i] >> 8;
-			const uint8_t lower = e->pal[i] & 0x00FF;
-			fputc(upper, f_pal);
-			fputc(lower, f_pal);
+			fwrite_uint16be(e->pal[i], f_pal);
 		}
 		*pal_offs += e->pal_size * sizeof(uint16_t);
 	}
@@ -301,24 +300,38 @@ char *sym_underscore_conversion(const char *sym_name)
 	return sym_buf;
 }
 
-void entry_emit_header_pal_decl(FILE *f, int pal_offs, const char *sym_name, bool c_lang)
+void entry_emit_header_data_decl(FILE *f, size_t pal_offs, size_t map_offs,
+                                 const char *sym_name, bool c_lang)
 {
+	char *sym_buf = sym_underscore_conversion(sym_name);
 	if (pal_offs > 0)
 	{
-		char *sym_buf = sym_underscore_conversion(sym_name);
 
 		if (c_lang)
 		{
 			fprintf(f, "// Palette block forward declaration.\n");
 			fprintf(f, "#ifndef __ASSEMBLER__\n");
-			fprintf(f, "extern const uint8_t %s_pal[0x%X];\n", sym_buf, pal_offs);
+			fprintf(f, "extern const uint8_t %s_pal[0x%X];\n", sym_buf, (uint32_t)pal_offs);
 			fprintf(f, "#else\n");
-			fprintf(f, "\t.extern\t%s_pal\n", sym_buf);
+			fprintf(f, "\t.extern\t%s_pal  // %d bytes\n", sym_buf, (uint32_t)pal_offs);
 			fprintf(f, "#endif  // __ASSEMBLER__\n");
+			fprintf(f, "#define k_%s_pal_bytes (%d)\n", sym_buf, (uint32_t)pal_offs);
 		}
-
-		free(sym_buf);
 	}
+	if (map_offs > 0)
+	{
+		if (c_lang)
+		{
+			fprintf(f, "// Mapping block forward declaration.\n");
+			fprintf(f, "#ifndef __ASSEMBLER__\n");
+			fprintf(f, "extern const uint8_t %s_map[0x%X];\n", sym_buf, (uint32_t)map_offs);
+			fprintf(f, "#else\n");
+			fprintf(f, "\t.extern\t%s_map  // %d bytes\n", sym_buf, (uint32_t)map_offs);
+			fprintf(f, "#endif  // __ASSEMBLER__\n");
+			fprintf(f, "#define k_%s_map_bytes (%d)\n", sym_buf, (uint32_t)map_offs);
+		}
+	}
+	free(sym_buf);
 }
 
 // Type declarations
@@ -361,4 +374,16 @@ void entry_emit_header_chr_size(FILE *f, const char *sym_name, size_t bytes)
 	fprintf(f, "\t.extern\t%s_chr\n", sym_buf);
 	fprintf(f, "#endif  // __ASSEMBLER__\n");
 	free(sym_buf);
+}
+
+void entry_emit_map(const Entry *e, FILE *f_map)
+{
+	switch (e->frame_cfg.data_format)
+	{
+		case DATA_FORMAT_MD_CSP:
+			mdcsp_emit_mapping(e, f_map);
+			break;
+		default:
+			break;
+	}
 }

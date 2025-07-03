@@ -164,9 +164,10 @@ int main(int argc, char **argv)
 		printf("Entry $%03X \"%s\": %d x %d, %d frames/tiles\n",
 		       e->id, e->symbol, e->frame_cfg.w, e->frame_cfg.h, e->frames);
 		entry_emit_pal(e, f_pal, &pal_offs);
-		entry_emit_meta(e, &conv, f_inc, e->pal_block_offs, false);
-		entry_emit_meta(e, &conv, f_hdr, e->pal_block_offs, true);
+		entry_emit_meta(e, f_inc, e->pal_block_offs, false);
+		entry_emit_meta(e, f_hdr, e->pal_block_offs, true);
 		entry_emit_chr(e, f_chr);
+		entry_emit_map(e, f_map);
 
 		formats_used[e->frame_cfg.data_format] = true;
 
@@ -187,7 +188,7 @@ int main(int argc, char **argv)
 		entry_emit_type_decl(f_hdr, fmt, true);
 	}
 
-	entry_emit_header_pal_decl(f_hdr, pal_offs, conv.out, true);
+	entry_emit_header_data_decl(f_hdr, pal_offs, conv.map_pos, conv.out, true);
 	entry_emit_header_chr_size(f_hdr, conv.out, ftell(f_chr));
 
 done:

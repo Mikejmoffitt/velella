@@ -12,6 +12,7 @@ static const char *kstring_for_data_format[DATA_FORMAT_COUNT] =
 	[DATA_FORMAT_CPS_BG] = "cps_bg",
 	[DATA_FORMAT_MD_SPR] = "md_spr",
 	[DATA_FORMAT_MD_BG] = "md_bg",
+	[DATA_FORMAT_MD_CSP] = "md_csp",
 };
 
 DataFormat data_format_for_string(const char *str)

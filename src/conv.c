@@ -6,6 +6,8 @@
 #include <string.h>
 #include <ctype.h>
 #include "lodepng.h"
+#include "mdcsp_claim.h"
+#include "mdcsp_mapping.h"
 
 #define TILESIZE_DEFAULT 16
 #define DEPTH_DEFAULT 4
@@ -130,6 +132,7 @@ bool conv_validate(Conv *s)
 
 		case DATA_FORMAT_MD_SPR:
 		case DATA_FORMAT_MD_BG:
+		case DATA_FORMAT_MD_CSP:
 			if (s->frame_cfg.depth != 4)
 			{
 				fprintf(stderr, "[CONV] MD only supports 4bpp tile data.\n");
@@ -195,6 +198,9 @@ bool conv_entry_add(Conv *s)
 		e->symbol_upper[i] = toupper(e->symbol[i]);
 	}
 	e->frame_cfg = s->frame_cfg;
+
+	e->chr_offs = s->chr_pos;
+	e->map_offs = s->map_pos;
 
 	FrameCfg *frame_cfg = &e->frame_cfg;
 
@@ -288,6 +294,9 @@ bool conv_entry_add(Conv *s)
 			if (frame_cfg->h < 8) frame_cfg->h = 8;
 			else if (frame_cfg->h > 32) frame_cfg->h = 32;
 			break;
+		case DATA_FORMAT_MD_CSP:
+			frame_cfg->tilesize = 8;
+			break;
 
 		default:
 			break;
@@ -348,7 +357,6 @@ bool conv_entry_add(Conv *s)
 		case DATA_FORMAT_MD_SPR:
 			e->md_spr.size_code = yoko ? ((frame_tiles_x-1)<<2) | (frame_tiles_y-1)
 			                           : ((frame_tiles_y-1)<<2) | (frame_tiles_x-1);
-
 			break;
 
 		default:
@@ -367,12 +375,13 @@ bool conv_entry_add(Conv *s)
 	// and get the actual used chr size before allocating.
 
 	const int chr_bytes_per = sw_adj * sh_adj;
-	e->chr_bytes = (frame_count_x * frame_count_y) * chr_bytes_per;
-	e->chr = malloc(e->chr_bytes);
+	const size_t expected_chr_bytes = (frame_count_x * frame_count_y) * chr_bytes_per;
+	e->chr_bytes = 0;
+	e->chr = malloc(expected_chr_bytes);
 	if (!e->chr)
 	{
 		fprintf(stderr, "[ENTRY $%03X] Couldn't allocate CHR %lu bytes\n", e->id,
-		        e->chr_bytes);
+		        expected_chr_bytes);
 		free(png);
 		free(px);
 		return false;
@@ -392,8 +401,8 @@ bool conv_entry_add(Conv *s)
 	{
 		for (int inner = 0; inner < png_inner; inner++)
 		{
-			const int pngy = outer;
-			const int pngx = inner;
+			const int png_src_y = outer;
+			const int png_src_x = inner;
 
 			switch (frame_cfg->data_format)
 			{
@@ -402,15 +411,165 @@ bool conv_entry_add(Conv *s)
 				case DATA_FORMAT_CPS_SPR:  // TODO: For CPS SPR, pass in a tile skip flag.
 				case DATA_FORMAT_CPS_BG:
 				case DATA_FORMAT_MD_BG:
-					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, frame_cfg->tilesize, frame_cfg->angle, 0, chr_w);
+					chr_w = tile_read_frame(px, png_w, png_src_x, png_src_y,
+					                        sw_adj, sh_adj,
+					                        frame_cfg->tilesize,
+					                        frame_cfg->angle,
+					                        0, chr_w);
+					e->chr_bytes += chr_bytes_per;
 					break;
 					
 				case DATA_FORMAT_SP013:
-					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, /*tilesize=*/0, frame_cfg->angle, 0,  chr_w);
+					chr_w = tile_read_frame(px, png_w, png_src_x, png_src_y,
+					                        sw_adj, sh_adj,
+					                        /*tilesize=*/0,
+					                        frame_cfg->angle,
+					                        0,  chr_w);
+					e->chr_bytes += chr_bytes_per;
 					break;
 
 				case DATA_FORMAT_MD_SPR:
-					chr_w = tile_read_frame(px, png_w, pngx, pngy, sw_adj, sh_adj, frame_cfg->tilesize, frame_cfg->angle, TILE_READ_FLAG_X_MAJOR, chr_w);
+					chr_w = tile_read_frame(px, png_w, png_src_x, png_src_y,
+					                        sw_adj, sh_adj,
+					                        frame_cfg->tilesize, frame_cfg->angle,
+					                        TILE_READ_FLAG_X_MAJOR, chr_w);
+					e->chr_bytes += chr_bytes_per;
+					break;
+				case DATA_FORMAT_MD_CSP:
+					// This is mostly a rewrite of claim() from png2csp.
+					{
+						static const int k_tile_bytes = 8*8*sizeof(uint8_t);
+						static const int k_md_static_spr_offs = 128;
+						const int base_spr_index = e->md_csp.spr_count;
+						int spr_in_sprite = 0;
+						const int base_tile_index = e->md_csp.tile_count;
+						int tiles_for_sprite = 0;
+
+						// TODO: Support more than center origin, using origin_for_sp()
+						const int ox = sw_adj/2;
+						const int oy = sh_adj/2;
+
+						// Clip region determined by claim
+						int clip_x, clip_y;
+
+						// The relative x/y is used to bake in the 128px offset.
+						int last_vx = -k_md_static_spr_offs;
+						int last_vy = -k_md_static_spr_offs;
+						int last_fvx = -k_md_static_spr_offs;
+						int last_fvy = -k_md_static_spr_offs;
+
+						ClaimSize claim_size;
+						while ((claim_size = mdcsp_claim(px, png_src_x*sw_adj, png_src_y*sh_adj,
+						                                 sw_adj, sh_adj,
+						                                 png_w, png_h,
+						                                 &clip_x, &clip_y)))
+						{
+							spr_in_sprite++;
+							//
+							// Store the PCG data for one claim's worth of tiles.
+							//
+							uint8_t tile_data[k_tile_bytes * 4 * 4];  // Up to one 32x32px sprite (16 tiles).
+							int tiles_clipped = 0;
+
+							const int tiles_w = mdcsp_w_for_claim(claim_size);
+							const int tiles_h = mdcsp_h_for_claim(claim_size);
+
+							//printf("F%02d Sp%02d: %d, %d %dx%d\n", e->md_csp.ref_count, e->md_csp.spr_count, clip_x, clip_y, tiles_w, tiles_h);
+
+							// TODO: Do we need limx/limy here?
+							//const int limx = sx + sw;
+							//const int limy = sy + sh;
+
+							// Copy tiles into local tile_data cache.
+
+							// TODO: Handle rotation for non-0 degree config? maybe it works?
+							uint8_t *tile_data_w = tile_data;
+
+							tile_read_frame(px, png_w,
+							                clip_x, clip_y,
+							                tiles_w*frame_cfg->tilesize,
+							                tiles_h*frame_cfg->tilesize,
+							                frame_cfg->tilesize,
+							                frame_cfg->angle,
+							                TILE_READ_FLAG_X_MAJOR|TILE_READ_FLAG_ERASE|TILE_READ_POS_DIRECT,
+							                tile_data_w);
+
+							tiles_clipped += mdcsp_tiles_for_claim(claim_size);
+							/*static inline uint8_t *tile_read_frame(uint8_t *px,
+							 i nt png_w, int *png_x, int png_y,
+							 int sw_adj, int sh_adj,
+							 int tilesize,
+							 int angle,
+							 uint32_t flags,
+							 uint8_t *chr_w)
+							for (int tx = 0; tx < tiles_w; tx++)
+							{
+								for (int ty = 0; ty < tiles_h; ty++)
+								{
+									tile_data_w = tile_read_frame(px, png_w,
+									                              clip_x+(tx * frame_cfg->tilesize),
+									                              clip_y+(ty * frame_cfg->tilesize),
+									                              frame_cfg->tilesize,
+									                              frame_cfg->tilesize,
+									                              frame_cfg->tilesize,
+									                              frame_cfg->angle, 0, tile_data_w);
+									tiles_clipped++;
+								}
+							}*/
+
+							// Copy the claimed tiles into CHR.
+							memcpy(chr_w, tile_data, k_tile_bytes * tiles_clipped);
+							e->md_csp.tile_count += tiles_clipped;
+
+							chr_w += k_tile_bytes * tiles_clipped;
+
+							// Record the hardware sprite entry.
+							const int vx = ((clip_x % sw_adj) - ox);
+							const int vy = ((clip_y % sh_adj) - oy);
+
+							int fvx = -1 * ((clip_x % sw_adj) - ox);
+							int fvy = -1 * ((clip_y % sh_adj) - oy);
+							//		fvx -= (fvx - ox);
+							fvx -= tiles_w * frame_cfg->tilesize;
+							//		fvy -= (fvy - oy);
+							fvy -= tiles_h * frame_cfg->tilesize;
+
+							MdCspSpr *spr = &e->md_csp.spr_dat[e->md_csp.spr_count];
+							e->md_csp.spr_count++;
+
+							spr->dx = vx - last_vx;
+							spr->dy = vy - last_vy;
+							spr->w = tiles_w;
+							spr->h = tiles_h;
+							spr->tile = tiles_for_sprite;
+							spr->flip_dx = fvx - last_fvx;
+							spr->flip_dy = fvy - last_fvy;
+
+							last_vx = vx;
+							last_vy = vy;
+							last_fvx = fvx;
+							last_fvy = fvy;
+
+							tiles_for_sprite += tiles_clipped;
+							if (e->md_csp.dma_buffer_tiles < tiles_for_sprite)
+							{
+								e->md_csp.dma_buffer_tiles = tiles_for_sprite;
+							}
+						}
+						// Once all tiles have been claimed, make a ref entry for the sprites.
+						// printf("F%02d: %d sprites, %d tiles\n", e->md_csp.ref_count, spr_in_sprite, tiles_for_sprite);
+
+						e->chr_bytes += tiles_for_sprite * k_tile_bytes;  // in 8bpp terms.
+						MdCspRef *ref = &e->md_csp.ref_dat[e->md_csp.ref_count];
+						ref->spr_count = spr_in_sprite;  // Hardware sprite count.
+						ref->spr_index = base_spr_index;
+						ref->tile_index = base_tile_index;
+						ref->tile_count = tiles_for_sprite;
+
+						e->md_csp.ref_count++;
+
+						//
+					}
 					break;
 				default:
 					break;
@@ -421,6 +580,35 @@ bool conv_entry_add(Conv *s)
 		}
 	}
 	e->frames = frame_no;
+
+	// Close out any mapping data and advance
+
+	switch (frame_cfg->data_format)
+	{
+		case DATA_FORMAT_MD_CSP:
+			e->map_bytes = mdcsp_bytes_for_mapping(e->md_csp.ref_count, e->md_csp.spr_count);
+			break;
+
+		default:
+			break;
+	}
+	s->map_pos += e->map_bytes;
+
+	switch (frame_cfg->depth)
+	{
+		case 1:
+			s->chr_pos += e->chr_bytes/8;
+			break;
+		case 2:
+			s->chr_pos += e->chr_bytes/4;
+			break;
+		case 4:
+			s->chr_pos += e->chr_bytes/2;
+			break;
+		case 8:
+			s->chr_pos += e->chr_bytes;
+			break;
+	}
 
 	free(png);
 	free(px);

@@ -29,6 +29,29 @@ typedef struct FrameCfg
 	
 } FrameCfg;
 
+// MD CSP reference struct. This defines a composite sprite frame,
+// referring to which sprite(s) within the mapping block area to use.
+typedef struct MdCspRef
+{
+	uint16_t spr_count;  // Sprite quantity used.
+	uint16_t spr_index;  // Starting index of MdCspSpr entries.
+	uint16_t tile_index;  // Tile offset within data block for this entry.
+	uint16_t tile_count;  // Tile count, used for DMA.
+} MdCspRef;
+
+#define MDCSP_MAX_REF_COUNT 0x100
+#define MDCSP_MAX_SPR_COUNT 0x100
+
+// MD CSP spr struct. This defines how to place one sprite as part of a
+// metasprite. One or more of these are referenced by a MdCspRef entry.
+typedef struct MdCspSpr
+{
+	int16_t dx, dy;  // Relative offsets.
+	int16_t w, h;    // In tiles.
+	uint16_t tile;   // From the start of the VRAM for the CSP Ref.
+	int16_t flip_dx, flip_dy;
+} MdCspSpr;
+
 typedef struct Entry Entry;
 struct Entry
 {
@@ -61,13 +84,24 @@ struct Entry
 	{
 		uint16_t size_code;
 	} md_spr;
+	struct
+	{
+		MdCspRef ref_dat[MDCSP_MAX_REF_COUNT];
+		int ref_count;
+		MdCspSpr spr_dat[MDCSP_MAX_SPR_COUNT];
+		int spr_count;
+		int tile_count;
+		int dma_buffer_tiles;  // High score of tile count through all refs
+	} md_csp;
 
 	// The bitmap data.
 	uint8_t *chr;
+	size_t chr_offs;
 	size_t chr_bytes;
 
 	// Mapping.
-	int mapping_offs;
+	size_t map_offs;
+	size_t map_bytes;
 };
 
 // State for the conversion process.
@@ -85,4 +119,7 @@ typedef struct Conv
 	char src[256];           // Source image filename.
 	char symbol[256];        // Symbol name (section).
 	FrameCfg frame_cfg;
+
+	size_t chr_pos;
+	size_t map_pos;
 } Conv;

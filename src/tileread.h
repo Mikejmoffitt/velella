@@ -7,9 +7,12 @@
 enum
 {
 	TILE_READ_FLAG_X_MAJOR = 0x0001,
+	TILE_READ_FLAG_ERASE   = 0x0002,  // Erase the data read from the image data.
+	TILE_READ_POS_DIRECT   = 0x0004,  // source x/y specified in pixels, not frame slices.
 };
 
-static inline uint8_t *tile_read_frame(const uint8_t *px, int png_w, int png_x, int png_y, int sw_adj, int sh_adj, int tilesize, int angle, uint32_t flags, uint8_t *chr_w);
+static inline uint8_t *tile_read_tile(uint8_t *px_frame, int src_w, int tw, int th, int angle, uint32_t flags, uint8_t *chr_w);
+static inline uint8_t *tile_read_frame(uint8_t *px, int png_w, int png_x, int png_y, int sw_adj, int sh_adj, int tilesize, int angle, uint32_t flags, uint8_t *chr_w);
 
 
 
@@ -27,7 +30,7 @@ static inline uint8_t *tile_read_frame(const uint8_t *px, int png_w, int png_x, 
 // angle: rotation angle (90 degree only)
 // chr_w: handle to output buffer
 // returns new output buffer handle, advanced by pixel count (sw * sh)
-static inline uint8_t *read_tile_px(const uint8_t *px_frame, int src_w, int tw, int th, int angle, uint8_t *chr_w)
+static inline uint8_t *tile_read_tile(uint8_t *px_frame, int src_w, int tw, int th, int angle, uint32_t flags, uint8_t *chr_w)
 {
 	const bool yoko = ((angle == 0) || (angle == 180));
 	const int touter_lim = yoko ? th : tw;
@@ -67,8 +70,10 @@ static inline uint8_t *read_tile_px(const uint8_t *px_frame, int src_w, int tw, 
 					break;
 			}
 
-			const uint8_t pixel = px_frame[(yoffs*src_w) + xoffs];
+			const unsigned int px_idx = (yoffs*src_w) + xoffs;
+			const uint8_t pixel = px_frame[px_idx];
 			*chr_w++ = pixel;
+			if (flags & TILE_READ_FLAG_ERASE) px_frame[px_idx] = 0;
 
 #ifdef TILEREAD_DEBUG_OUT
 			printf("%c", pixel == 0 ? ' ' : '0' + pixel);
@@ -86,7 +91,7 @@ static inline uint8_t *read_tile_px(const uint8_t *px_frame, int src_w, int tw, 
 // TODO: for CPS SPR, add a tile skip bool.
 //       also consider a separate usage counting function, or let this write back to a tile skip array.
 //       and, if chr_w is NULL, run as a read-only test run for tile counting.
-static inline uint8_t *tile_read_frame(const uint8_t *px,
+static inline uint8_t *tile_read_frame(uint8_t *px,
                                        int png_w, int png_x, int png_y,
                                        int sw_adj, int sh_adj,
                                        int tilesize,
@@ -98,6 +103,10 @@ static inline uint8_t *tile_read_frame(const uint8_t *px,
 
 	const bool x_major = (flags & TILE_READ_FLAG_X_MAJOR) ? true : false;
 	const bool y_major = (yoko && !x_major) || (!yoko && !x_major);
+
+	const bool coords_direct = flags &TILE_READ_POS_DIRECT;
+	const int src_x_coef = coords_direct ? 1 : sw_adj;
+	const int src_y_coef = coords_direct ? 1 : sh_adj;
 
 	const int tile_outer_count = (tilesize <= 0) ? 1 : (((y_major ? sh_adj : sw_adj)/tilesize));
 	const int tile_inner_count = (tilesize <= 0) ? 1 : (((y_major ? sw_adj : sh_adj)/tilesize));
@@ -166,17 +175,17 @@ static inline uint8_t *tile_read_frame(const uint8_t *px,
 				}
 			}
 
-			const int src_y = ((png_y * sh_adj) + (ty * tilesize));
-			const int src_x = ((png_x * sw_adj) + (tx * tilesize));
+			const int src_y = ((png_y * src_y_coef) + (ty * tilesize));
+			const int src_x = ((png_x * src_x_coef) + (tx * tilesize));
 
 			const int base_idx = (src_y * png_w) + src_x;;
-			const uint8_t *px_frame = &px[base_idx];  // Top-left of frame.
+			uint8_t *px_frame = &px[base_idx];  // Top-left of frame.
 			const int clip_w = (tilesize <= 0) ? sw_adj : tilesize;
 			const int clip_h = (tilesize <= 0) ? sh_adj : tilesize;
 #ifdef TILEREAD_DEBUG_OUT
 			printf("  read idx %d, %d --> %d, %d\n", tx, ty, src_x, src_y);
 #endif  // TILEREAD_DEBUG_OUT
-			chr_w = read_tile_px(px_frame, png_w, clip_w, clip_h, angle, chr_w);
+			chr_w = tile_read_tile(px_frame, png_w, clip_w, clip_h, angle, flags, chr_w);
 		}
 	}
 	return chr_w;
