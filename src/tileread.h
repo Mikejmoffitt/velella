@@ -221,10 +221,14 @@ static inline uint8_t *tile_read_frame(uint8_t *px,
 			int clip_lim_w = clip_w;
 			int clip_lim_h = clip_h;
 
+#ifdef TILEREAD_DEBUG_OUT
 			printf("src %d, %d : %dx%d --> ", src_x, src_y, clip_lim_w, clip_lim_h);
+#endif  // TILEREAD_DEBUG_OUT
 			if (lim_x >= 0 && src_x + clip_lim_w > lim_x) clip_lim_w = lim_x - src_x;
 			if (lim_y >= 0 && src_y + clip_lim_h > lim_y) clip_lim_h = lim_y - src_y;
+#ifdef TILEREAD_DEBUG_OUT
 			printf(" %d, %d : %dx%d\n", src_x, src_y, clip_lim_w, clip_lim_h);
+#endif  // TILEREAD_DEBUG_OUT
 
 
 #ifdef TILEREAD_DEBUG_OUT
