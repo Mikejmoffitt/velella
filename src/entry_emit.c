@@ -85,9 +85,6 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
 			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
 			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
-			fprintf(f_inc, "%s%s_MAP_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->map_offs);
-			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
 			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
 			fprintf(f_inc, "%s%s_SIZE %s%s%02X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->md_spr.size_code);
@@ -106,6 +103,16 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			fprintf(f_inc, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
 			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);  // whereas the "frame" is used to chop major tiles
 			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->w);
+			break;
+
+		case DATA_FORMAT_MD_CSP:
+			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
+			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
+			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
+			fprintf(f_inc, "%s%s_MAP_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->map_offs);
+			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
+			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
+			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->md_csp.ref_count);
 			break;
 
 		default:
@@ -306,7 +313,6 @@ void entry_emit_header_data_decl(FILE *f, size_t pal_offs, size_t map_offs,
 	char *sym_buf = sym_underscore_conversion(sym_name);
 	if (pal_offs > 0)
 	{
-
 		if (c_lang)
 		{
 			fprintf(f, "// Palette block forward declaration.\n");
@@ -316,6 +322,10 @@ void entry_emit_header_data_decl(FILE *f, size_t pal_offs, size_t map_offs,
 			fprintf(f, "\t.extern\t%s_pal  // %d bytes\n", sym_buf, (uint32_t)pal_offs);
 			fprintf(f, "#endif  // __ASSEMBLER__\n");
 			fprintf(f, "#define k_%s_pal_bytes (%d)\n", sym_buf, (uint32_t)pal_offs);
+			fprintf(f, "\n");
+			fprintf(f, "// Palette access macro by resource name.\n");
+			fprintf(f, "#define vel_get_%s_pal(_resname) &%s_pal[_resname##_PAL_OFFS]\n", sym_buf, sym_buf);
+			fprintf(f, "\n");
 		}
 	}
 	if (map_offs > 0)
@@ -329,6 +339,10 @@ void entry_emit_header_data_decl(FILE *f, size_t pal_offs, size_t map_offs,
 			fprintf(f, "\t.extern\t%s_map  // %d bytes\n", sym_buf, (uint32_t)map_offs);
 			fprintf(f, "#endif  // __ASSEMBLER__\n");
 			fprintf(f, "#define k_%s_map_bytes (%d)\n", sym_buf, (uint32_t)map_offs);
+			fprintf(f, "\n");
+			fprintf(f, "// Mapping access macro by resource name.\n");
+			fprintf(f, "#define vel_get_%s_map(_resname) &%s_map[_resname##_MAP_OFFS]\n", sym_buf, sym_buf);
+			fprintf(f, "\n");
 		}
 	}
 	free(sym_buf);
@@ -373,6 +387,10 @@ void entry_emit_header_chr_size(FILE *f, const char *sym_name, size_t bytes)
 	fprintf(f, "#else\n");
 	fprintf(f, "\t.extern\t%s_chr\n", sym_buf);
 	fprintf(f, "#endif  // __ASSEMBLER__\n");
+	fprintf(f, "\n");
+	fprintf(f, "// Mapping access macro by resource name.\n");
+	fprintf(f, "#define vel_get_%s_chr(_resname) &%s_chr[_resname##_CHR_OFFS]\n", sym_buf, sym_buf);
+	fprintf(f, "\n");
 	free(sym_buf);
 }
 

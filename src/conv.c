@@ -411,27 +411,36 @@ bool conv_entry_add(Conv *s)
 				case DATA_FORMAT_CPS_SPR:  // TODO: For CPS SPR, pass in a tile skip flag.
 				case DATA_FORMAT_CPS_BG:
 				case DATA_FORMAT_MD_BG:
-					chr_w = tile_read_frame(px, png_w, png_src_x, png_src_y,
+					chr_w = tile_read_frame(px,
+					                        png_w, png_h,
+					                        png_src_x, png_src_y,
 					                        sw_adj, sh_adj,
 					                        frame_cfg->tilesize,
 					                        frame_cfg->angle,
+					                        -1, -1,
 					                        0, chr_w);
 					e->chr_bytes += chr_bytes_per;
 					break;
 					
 				case DATA_FORMAT_SP013:
-					chr_w = tile_read_frame(px, png_w, png_src_x, png_src_y,
+					chr_w = tile_read_frame(px,
+					                        png_w, png_h,
+					                        png_src_x, png_src_y,
 					                        sw_adj, sh_adj,
 					                        /*tilesize=*/0,
 					                        frame_cfg->angle,
+					                        -1, -1,
 					                        0,  chr_w);
 					e->chr_bytes += chr_bytes_per;
 					break;
 
 				case DATA_FORMAT_MD_SPR:
-					chr_w = tile_read_frame(px, png_w, png_src_x, png_src_y,
+					chr_w = tile_read_frame(px,
+					                        png_w, png_h,
+					                        png_src_x, png_src_y,
 					                        sw_adj, sh_adj,
 					                        frame_cfg->tilesize, frame_cfg->angle,
+					                        -1, -1,
 					                        TILE_READ_FLAG_X_MAJOR, chr_w);
 					e->chr_bytes += chr_bytes_per;
 					break;
@@ -476,21 +485,33 @@ bool conv_entry_add(Conv *s)
 
 							//printf("F%02d Sp%02d: %d, %d %dx%d\n", e->md_csp.ref_count, e->md_csp.spr_count, clip_x, clip_y, tiles_w, tiles_h);
 
-							// TODO: Do we need limx/limy here?
-							//const int limx = sx + sw;
-							//const int limy = sy + sh;
+							// Stop it from scooping data from the adjacent frame.
+							const int limx = png_src_x*sw_adj + sw_adj;
+							const int limy = png_src_y*sh_adj + sh_adj;
+
+							const int clip_w = tiles_w*frame_cfg->tilesize;
+							const int clip_h = tiles_h*frame_cfg->tilesize;
+
+							// printf("clip (%d, %d: %dx%d) x (%d, %d) lim %d, %d\n", clip_x, clip_y, clip_w, clip_h, clip_x+clip_w, clip_y+clip_h, limx, limy);
+
+						//	if (clip_x + clip_w > limx) clip_w = limx - clip_x;
+						//	if (clip_y + clip_h > limy) clip_h = limy - clip_h;
+
+
+						//	printf("> becomes (%d, %d: %dx%d) x (%d, %d)\n", clip_x, clip_y, clip_w, clip_h, clip_x+clip_w, clip_y+clip_h, );
 
 							// Copy tiles into local tile_data cache.
 
 							// TODO: Handle rotation for non-0 degree config? maybe it works?
 							uint8_t *tile_data_w = tile_data;
 
-							tile_read_frame(px, png_w,
+							tile_read_frame(px,
+							                png_w, png_h,
 							                clip_x, clip_y,
-							                tiles_w*frame_cfg->tilesize,
-							                tiles_h*frame_cfg->tilesize,
+							                clip_w, clip_h,
 							                frame_cfg->tilesize,
 							                frame_cfg->angle,
+							                limx, limy,
 							                TILE_READ_FLAG_X_MAJOR|TILE_READ_FLAG_ERASE|TILE_READ_POS_DIRECT,
 							                tile_data_w);
 

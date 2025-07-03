@@ -4,7 +4,7 @@ CP := cp
 MKDIR := mkdir
 RM := rm
 CC := gcc
-CFLAGS := -O3 -Wall -Wpedantic -Werror -std=c99
+CFLAGS := -O3 -Wall -Wpedantic -Werror -std=c11
 INSTALL_PREFIX := /usr/bin
 ifdef SYSTEMROOT
 	APPEXT := .exe

@@ -4,7 +4,8 @@
 
 Header format:
 $00    2   ref count (available images)
-$02    4   spr list offs (longword)
+$02    2   spr list offs (longword)
+$04    2   required fixed vram buffer words (for fixed usage)
 $06    2   required dma vram buffer words (based on tile count of biggest frame)
 $08    ..  ref list
 ...    ..  spr list
@@ -13,7 +14,7 @@ Ref format:
 $00    2   hw sprite count
 $02    2   spr list offs
 $04    2   tile index (within CHR data associated)
-$06    2   chr_words (DMA size, if used in such a mode)
+$06    2   tile words (DMA size, if used in such a mode)
 
 Spr format:
 $00    2   dy
@@ -34,7 +35,7 @@ $0E    2   flip dx
 #include <stdio.h>
 #include "endian.h"
 
-#define MDCSP_HEADER_BYTES 0x06
+#define MDCSP_HEADER_BYTES 0x08
 #define MDCSP_REF_BYTES    0x08
 #define MDCSP_SPR_BYTES    0x10
 
@@ -47,11 +48,13 @@ static inline size_t mdcsp_bytes_for_mapping(int ref_count, int spr_count)
 // Returns bytes used for mapping.
 static inline size_t mdcsp_emit_mapping(const Entry *e, FILE *f)
 {
-	const uint32_t sprlist_offs = MDCSP_HEADER_BYTES + (e->md_csp.ref_count*MDCSP_REF_BYTES);
+	const uint16_t sprlist_offs = MDCSP_HEADER_BYTES + (e->md_csp.ref_count*MDCSP_REF_BYTES);
+	const uint16_t fixed_buffer_words = (e->chr_bytes / 2) / (sizeof(uint16_t));
 	const uint16_t vram_buffer_words = e->md_csp.dma_buffer_tiles * (32 / sizeof(uint16_t));
 
 	fwrite_uint16be(e->md_csp.ref_count, f);
-	fwrite_uint32be(sprlist_offs, f);
+	fwrite_uint16be(sprlist_offs, f);
+	fwrite_uint16be(fixed_buffer_words, f);
 	fwrite_uint16be(vram_buffer_words, f);
 
 	// Ref list.
