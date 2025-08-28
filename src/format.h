@@ -16,6 +16,7 @@ typedef enum DataFormat
 	DATA_FORMAT_MD_SPR,      // Megadrive direct sprite data.
 	DATA_FORMAT_MD_BG,       // Megadrive direct background data.
 	DATA_FORMAT_MD_CSP,      // Megadrive composite sprite data.
+	DATA_FORMAT_TOA_TXT,     // Toaplan text tilemap layer.
 	
 	DATA_FORMAT_COUNT
 } DataFormat;

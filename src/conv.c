@@ -133,9 +133,10 @@ bool conv_validate(Conv *s)
 		case DATA_FORMAT_MD_SPR:
 		case DATA_FORMAT_MD_BG:
 		case DATA_FORMAT_MD_CSP:
+		case DATA_FORMAT_TOA_TXT:
 			if (s->frame_cfg.depth != 4)
 			{
-				fprintf(stderr, "[CONV] MD only supports 4bpp tile data.\n");
+				fprintf(stderr, "[CONV] Only 4bpp tile data is supported for this format.\n");
 				return false;
 			}
 			break;
@@ -287,13 +288,17 @@ bool conv_entry_add(Conv *s)
 			break;
 
 		case DATA_FORMAT_MD_SPR:
-		case DATA_FORMAT_MD_BG:
 			frame_cfg->tilesize = 8;
 			if (frame_cfg->w < 8) frame_cfg->w = 8;
 			else if (frame_cfg->w > 32) frame_cfg->w = 32;
 			if (frame_cfg->h < 8) frame_cfg->h = 8;
 			else if (frame_cfg->h > 32) frame_cfg->h = 32;
 			break;
+		case DATA_FORMAT_MD_BG:
+		case DATA_FORMAT_TOA_TXT:
+			frame_cfg->tilesize = 8;
+			break;
+
 		case DATA_FORMAT_MD_CSP:
 			frame_cfg->tilesize = 8;
 			break;
@@ -435,11 +440,13 @@ bool conv_entry_add(Conv *s)
 					break;
 
 				case DATA_FORMAT_MD_SPR:
+				case DATA_FORMAT_TOA_TXT:
 					chr_w = tile_read_frame(px,
 					                        png_w, png_h,
 					                        png_src_x, png_src_y,
 					                        sw_adj, sh_adj,
-					                        frame_cfg->tilesize, frame_cfg->angle,
+					                        frame_cfg->tilesize,
+					                        frame_cfg->angle,
 					                        -1, -1,
 					                        TILE_READ_FLAG_X_MAJOR, chr_w);
 					e->chr_bytes += chr_bytes_per;

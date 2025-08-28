@@ -95,6 +95,7 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			break;
 
 		case DATA_FORMAT_MD_BG:
+		case DATA_FORMAT_TOA_TXT:
 			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
 			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
 			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
@@ -236,6 +237,7 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 		case DATA_FORMAT_MD_SPR:
 		case DATA_FORMAT_MD_BG:
 		case DATA_FORMAT_MD_CSP:
+		case DATA_FORMAT_TOA_TXT:
 			for (size_t i = 0; i < e->chr_bytes/2; i++)
 			{
 				const uint8_t px0 = *chr++;
@@ -328,7 +330,11 @@ void entry_emit_header_data_decl(FILE *f, size_t pal_offs, size_t map_offs,
 			fprintf(f, "#define k_%s_pal_bytes (%d)\n", sym_buf, (uint32_t)pal_offs);
 			fprintf(f, "\n");
 			fprintf(f, "// Palette access macro by resource name.\n");
+			fprintf(f, "#ifndef __ASSEMBLER__\n");
 			fprintf(f, "#define vel_get_%s_pal(_resname) &%s_pal[_resname##_PAL_OFFS]\n", sym_buf, sym_buf);
+			fprintf(f, "#else\n");
+			fprintf(f, "#define vel_get_%s_pal(_resname) (%s_pal+_resname##_PAL_OFFS)\n", sym_buf, sym_buf);
+			fprintf(f, "#endif\n");
 			fprintf(f, "\n");
 		}
 	}
@@ -345,7 +351,11 @@ void entry_emit_header_data_decl(FILE *f, size_t pal_offs, size_t map_offs,
 			fprintf(f, "#define k_%s_map_bytes (%d)\n", sym_buf, (uint32_t)map_offs);
 			fprintf(f, "\n");
 			fprintf(f, "// Mapping access macro by resource name.\n");
+			fprintf(f, "#ifndef __ASSEMBLER__\n");
 			fprintf(f, "#define vel_get_%s_map(_resname) &%s_map[_resname##_MAP_OFFS]\n", sym_buf, sym_buf);
+			fprintf(f, "#else\n");
+			fprintf(f, "#define vel_get_%s_map(_resname) (%s_map+_resname##_MAP_OFFS)\n", sym_buf, sym_buf);
+			fprintf(f, "#endif\n");
 			fprintf(f, "\n");
 		}
 	}
@@ -393,7 +403,11 @@ void entry_emit_header_chr_size(FILE *f, const char *sym_name, size_t bytes)
 	fprintf(f, "#endif  // __ASSEMBLER__\n");
 	fprintf(f, "\n");
 	fprintf(f, "// Mapping access macro by resource name.\n");
+	fprintf(f, "#ifndef __ASSEMBLER__\n");
 	fprintf(f, "#define vel_get_%s_chr(_resname) &%s_chr[_resname##_CHR_OFFS]\n", sym_buf, sym_buf);
+	fprintf(f, "#else\n");
+	fprintf(f, "#define vel_get_%s_chr(_resname) (%s_chr+_resname##_CHR_OFFS)\n", sym_buf, sym_buf);
+	fprintf(f, "#endif\n");
 	fprintf(f, "\n");
 	free(sym_buf);
 }
