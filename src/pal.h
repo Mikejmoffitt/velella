@@ -14,6 +14,7 @@ typedef enum PalFormat
 	PAL_FORMAT_X68000,
 	PAL_FORMAT_MD,  // Packs things for MD/C2; uses extra precision bits.
 	PAL_FORMAT_CPS,  // Fade channel left at $F.
+	PAL_FORMAT_TOA,  // GCU-based hardware.
 
 	PAL_FORMAT_COUNT
 } PalFormat;

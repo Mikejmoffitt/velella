@@ -9,6 +9,7 @@ static const char *kstr_for_formats[PAL_FORMAT_COUNT] =
 	[PAL_FORMAT_X68000] = "x68000",
 	[PAL_FORMAT_MD] = "md",
 	[PAL_FORMAT_CPS] = "cps",
+	[PAL_FORMAT_TOA] = "toa",
 };
 
 bool pal_validate_selection(PalFormat fmt)
@@ -53,6 +54,12 @@ uint16_t pal_pack_entry(PalFormat fmt, uint8_t r, uint8_t g, uint8_t b)
 			g = g >> 4;
 			b = b >> 4;
 			return 0xF000 | (r << 8) | (g << 4) | (b);
+
+		case PAL_FORMAT_TOA:
+			r = r >> 3;
+			g = g >> 3;
+			b = b >> 3;
+			return (g << 5) | (b << 10) | r;
 
 		default:
 			fprintf(stderr, "[pal] Unhandled palette type %d\n", fmt);
