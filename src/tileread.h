@@ -188,7 +188,7 @@ static inline uint8_t *tile_read_frame(uint8_t *px,
 	const bool yoko = ((angle == 0) || (angle == 180));
 
 	const bool x_major = (flags & TILE_READ_FLAG_X_MAJOR) ? true : false;
-	const bool y_major = (yoko && !x_major) || (!yoko && !x_major);
+	const bool y_major = (yoko && !x_major) || (!yoko && x_major);
 
 	const bool coords_direct = flags &TILE_READ_POS_DIRECT;
 	const int src_x_coef = coords_direct ? 1 : sw_adj;
