@@ -321,14 +321,14 @@ void entry_emit_header_data_decl(FILE *f, size_t pal_offs, size_t map_offs,
 		{
 			fprintf(f, "// Palette block forward declaration.\n");
 			fprintf(f, "#ifndef __ASSEMBLER__\n");
-			fprintf(f, "extern const uint8_t %s_pal[0x%X];\n", sym_buf, (uint32_t)pal_offs);
+			fprintf(f, "extern const uint16_t %s_pal[0x%X/2];\n", sym_buf, (uint32_t)pal_offs);
 			fprintf(f, "#else\n");
 			fprintf(f, "\t.extern\t%s_pal  // %d bytes\n", sym_buf, (uint32_t)pal_offs);
 			fprintf(f, "#endif  // __ASSEMBLER__\n");
 			fprintf(f, "#define k_%s_pal_bytes (%d)\n", sym_buf, (uint32_t)pal_offs);
 			fprintf(f, "\n");
 			fprintf(f, "// Palette access macro by resource name.\n");
-			fprintf(f, "#define vel_get_%s_pal(_resname) &%s_pal[_resname##_PAL_OFFS]\n", sym_buf, sym_buf);
+			fprintf(f, "#define vel_get_%s_pal(_resname) &%s_pal[_resname##_PAL_OFFS/2]\n", sym_buf, sym_buf);
 			fprintf(f, "\n");
 		}
 	}
@@ -338,14 +338,14 @@ void entry_emit_header_data_decl(FILE *f, size_t pal_offs, size_t map_offs,
 		{
 			fprintf(f, "// Mapping block forward declaration.\n");
 			fprintf(f, "#ifndef __ASSEMBLER__\n");
-			fprintf(f, "extern const uint8_t %s_map[0x%X];\n", sym_buf, (uint32_t)map_offs);
+			fprintf(f, "extern const uint16_t %s_map[0x%X/2];\n", sym_buf, (uint32_t)map_offs);
 			fprintf(f, "#else\n");
 			fprintf(f, "\t.extern\t%s_map  // %d bytes\n", sym_buf, (uint32_t)map_offs);
 			fprintf(f, "#endif  // __ASSEMBLER__\n");
 			fprintf(f, "#define k_%s_map_bytes (%d)\n", sym_buf, (uint32_t)map_offs);
 			fprintf(f, "\n");
 			fprintf(f, "// Mapping access macro by resource name.\n");
-			fprintf(f, "#define vel_get_%s_map(_resname) &%s_map[_resname##_MAP_OFFS]\n", sym_buf, sym_buf);
+			fprintf(f, "#define vel_get_%s_map(_resname) &%s_map[_resname##_MAP_OFFS/2]\n", sym_buf, sym_buf);
 			fprintf(f, "\n");
 		}
 	}
@@ -387,13 +387,13 @@ void entry_emit_header_chr_size(FILE *f, const char *sym_name, size_t bytes)
 	char *sym_buf = sym_underscore_conversion(sym_name);
 	fprintf(f, "// Character data block forward declaration.\n");
 	fprintf(f, "#ifndef __ASSEMBLER__\n");
-	fprintf(f, "extern const uint8_t %s_chr[0x%lX];\n", sym_buf, bytes);
+	fprintf(f, "extern const uint16_t %s_chr[0x%lX/2];\n", sym_buf, bytes);
 	fprintf(f, "#else\n");
 	fprintf(f, "\t.extern\t%s_chr\n", sym_buf);
 	fprintf(f, "#endif  // __ASSEMBLER__\n");
 	fprintf(f, "\n");
 	fprintf(f, "// Mapping access macro by resource name.\n");
-	fprintf(f, "#define vel_get_%s_chr(_resname) &%s_chr[_resname##_CHR_OFFS]\n", sym_buf, sym_buf);
+	fprintf(f, "#define vel_get_%s_chr(_resname) &%s_chr[_resname##_CHR_OFFS/2]\n", sym_buf, sym_buf);
 	fprintf(f, "\n");
 	free(sym_buf);
 }
