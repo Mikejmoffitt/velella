@@ -133,13 +133,13 @@ bool conv_validate(Conv *s)
 		case DATA_FORMAT_MD_SPR:
 		case DATA_FORMAT_MD_BG:
 		case DATA_FORMAT_MD_CSP:
+		case DATA_FORMAT_MD_CBG:
 		case DATA_FORMAT_TOA_TXT:
 			if (s->frame_cfg.depth != 4)
 			{
 				fprintf(stderr, "[CONV] Only 4bpp tile data is supported for this format.\n");
 				return false;
 			}
-			break;
 
 		default:
 			fprintf(stderr, "[CONV] Data format %d NG!\n", frame_cfg->data_format);
@@ -362,6 +362,36 @@ bool conv_entry_add(Conv *s)
 		case DATA_FORMAT_MD_SPR:
 			e->md_spr.size_code = yoko ? ((frame_tiles_x-1)<<2) | (frame_tiles_y-1)
 			                           : ((frame_tiles_y-1)<<2) | (frame_tiles_x-1);
+			break;
+
+		case DATA_FORMAT_MD_CSP:
+			if (frame_cfg->angle != 0)
+			{
+				fprintf(stderr, "[CONV] MD composites do not yet support rotation.\n");
+				free(png);
+				free(px);
+				return false;
+			}
+			break;
+
+		// Composite background (optimized tilemap and chr data) does the fofllowing
+		// before emitting CHR data ordinarily:
+		// * Chop texture into tiles
+		// * Create layout mapping of tiles
+		// * Compare tile hashes to identify redundancies and make replacement list
+		// * Create optimized layout data and reduced tileset
+		//
+		// The optimized layout data is added to the entry as metadata to be emitted
+		// and the reduced tileset replaces the texture from the PNG from this point.
+		// That reduced tileset is then passed through the ordinary pipeline.
+		case DATA_FORMAT_MD_CBG:
+			if (frame_cfg->angle != 0)
+			{
+				fprintf(stderr, "[CONV] MD composites do not yet support rotation.\n");
+				free(png);
+				free(px);
+				return false;
+			}
 			break;
 
 		default:
