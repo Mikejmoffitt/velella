@@ -140,6 +140,7 @@ bool conv_validate(Conv *s)
 				fprintf(stderr, "[CONV] Only 4bpp tile data is supported for this format.\n");
 				return false;
 			}
+			break;
 
 		default:
 			fprintf(stderr, "[CONV] Data format %d NG!\n", frame_cfg->data_format);
