@@ -461,7 +461,7 @@ bool conv_entry_add(Conv *s)
 					                        frame_cfg->tilesize,
 					                        frame_cfg->angle,
 					                        -1, -1,
-					                        yoko ? 0 : TILE_READ_FLAG_X_MAJOR, chr_w);
+					                        0, chr_w);
 					e->chr_bytes += chr_bytes_per;
 					break;
 					
