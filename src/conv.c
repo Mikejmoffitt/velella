@@ -453,7 +453,6 @@ bool conv_entry_add(Conv *s)
 				case DATA_FORMAT_CPS_SPR:  // TODO: For CPS SPR, pass in a tile skip flag.
 				case DATA_FORMAT_CPS_BG:
 				case DATA_FORMAT_MD_BG:
-				case DATA_FORMAT_TOA_GCU_SPR:
 					chr_w = tile_read_frame(px,
 					                        png_w, png_h,
 					                        png_src_x, png_src_y,
@@ -479,6 +478,7 @@ bool conv_entry_add(Conv *s)
 
 				case DATA_FORMAT_MD_SPR:
 				case DATA_FORMAT_TOA_TXT:
+				case DATA_FORMAT_TOA_GCU_SPR:
 					chr_w = tile_read_frame(px,
 					                        png_w, png_h,
 					                        png_src_x, png_src_y,
