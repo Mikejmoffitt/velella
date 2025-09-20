@@ -489,6 +489,7 @@ bool conv_entry_add(Conv *s)
 					                        TILE_READ_FLAG_X_MAJOR, chr_w);
 					e->chr_bytes += chr_bytes_per;
 					break;
+
 				case DATA_FORMAT_MD_CSP:
 					// This is mostly a rewrite of claim() from png2csp.
 					{
@@ -537,14 +538,6 @@ bool conv_entry_add(Conv *s)
 							const int clip_w = tiles_w*frame_cfg->tilesize;
 							const int clip_h = tiles_h*frame_cfg->tilesize;
 
-							// printf("clip (%d, %d: %dx%d) x (%d, %d) lim %d, %d\n", clip_x, clip_y, clip_w, clip_h, clip_x+clip_w, clip_y+clip_h, limx, limy);
-
-						//	if (clip_x + clip_w > limx) clip_w = limx - clip_x;
-						//	if (clip_y + clip_h > limy) clip_h = limy - clip_h;
-
-
-						//	printf("> becomes (%d, %d: %dx%d) x (%d, %d)\n", clip_x, clip_y, clip_w, clip_h, clip_x+clip_w, clip_y+clip_h, );
-
 							// Copy tiles into local tile_data cache.
 
 							// TODO: Handle rotation for non-0 degree config? maybe it works?
@@ -561,27 +554,6 @@ bool conv_entry_add(Conv *s)
 							                tile_data_w);
 
 							tiles_clipped += mdcsp_tiles_for_claim(claim_size);
-							/*static inline uint8_t *tile_read_frame(uint8_t *px,
-							 i nt png_w, int *png_x, int png_y,
-							 int sw_adj, int sh_adj,
-							 int tilesize,
-							 int angle,
-							 uint32_t flags,
-							 uint8_t *chr_w)
-							for (int tx = 0; tx < tiles_w; tx++)
-							{
-								for (int ty = 0; ty < tiles_h; ty++)
-								{
-									tile_data_w = tile_read_frame(px, png_w,
-									                              clip_x+(tx * frame_cfg->tilesize),
-									                              clip_y+(ty * frame_cfg->tilesize),
-									                              frame_cfg->tilesize,
-									                              frame_cfg->tilesize,
-									                              frame_cfg->tilesize,
-									                              frame_cfg->angle, 0, tile_data_w);
-									tiles_clipped++;
-								}
-							}*/
 
 							// Copy the claimed tiles into CHR.
 							memcpy(chr_w, tile_data, k_tile_bytes * tiles_clipped);
