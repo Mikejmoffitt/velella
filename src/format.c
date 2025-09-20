@@ -5,16 +5,17 @@
 static const char *kstring_for_data_format[DATA_FORMAT_COUNT] =
 {
 	[DATA_FORMAT_UNSPECIFIED] = "{unspecified}",
-	[DATA_FORMAT_DIRECT] = "direct",
-	[DATA_FORMAT_SP013] = "sp013",
-	[DATA_FORMAT_BG038] = "bg038",
-	[DATA_FORMAT_CPS_SPR] = "cps_spr",
-	[DATA_FORMAT_CPS_BG] = "cps_bg",
-	[DATA_FORMAT_MD_SPR] = "md_spr",
-	[DATA_FORMAT_MD_BG] = "md_bg",
-	[DATA_FORMAT_MD_CSP] = "md_csp",
-	[DATA_FORMAT_MD_CBG] = "md_cbg",
-	[DATA_FORMAT_TOA_TXT] = "toa_txt"
+	[DATA_FORMAT_DIRECT]      = "direct",
+	[DATA_FORMAT_SP013]       = "sp013",
+	[DATA_FORMAT_BG038]       = "bg038",
+	[DATA_FORMAT_CPS_SPR]     = "cps_spr",
+	[DATA_FORMAT_CPS_BG]      = "cps_bg",
+	[DATA_FORMAT_MD_SPR]      = "md_spr",
+	[DATA_FORMAT_MD_BG]       = "md_bg",
+	[DATA_FORMAT_MD_CSP]      = "md_csp",
+	[DATA_FORMAT_MD_CBG]      = "md_cbg",
+	[DATA_FORMAT_TOA_TXT]     = "toa_txt",
+	[DATA_FORMAT_TOA_GCU_SPR] = "toa_gcu_spr",
 };
 
 DataFormat data_format_for_string(const char *str)

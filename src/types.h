@@ -93,6 +93,10 @@ struct Entry
 		int tile_count;
 		int dma_buffer_tiles;  // High score of tile count through all refs
 	} md_csp;
+	struct
+	{
+		uint32_t size_code;  // X in the upper word.
+	} gcu_spr;
 
 	// The bitmap data.
 	uint8_t *chr;

@@ -59,6 +59,7 @@ bool conv_validate(Conv *s)
 		return false;
 	}
 
+	// Tilesize and depth checks.
 	switch (s->frame_cfg.data_format)
 	{
 		case DATA_FORMAT_UNSPECIFIED:
@@ -74,10 +75,10 @@ bool conv_validate(Conv *s)
 				fprintf(stderr, "[CONV] WARNING: Tilesize %dpx specified, but "
 				        "specified hardware only supports 16px.\n",
 				        frame_cfg->tilesize);
-				frame_cfg->tilesize = 16;
+				return false;
 			}
 
-			if (s->frame_cfg.depth != 4 && s->frame_cfg.depth != 8)
+			if (frame_cfg->depth != 4 && frame_cfg->depth != 8)
 			{
 				fprintf(stderr, "[CONV] sp013 supports 4bpp or 8bpp tiles.\n");
 				return false;
@@ -94,10 +95,25 @@ bool conv_validate(Conv *s)
 				return false;
 			}
 
-			if (s->frame_cfg.depth != 4 && s->frame_cfg.depth != 8)
+			if (frame_cfg->depth != 4 && frame_cfg->depth != 8)
 			{
 				fprintf(stderr, "[CONV] bg038 supports 4bpp or 8bpp tiles.\n");
 				return false;
+			}
+
+			// Background tiles set the tilesize and "frame" width this way in order
+			// to support interleaved tile order; "tiles" become "frames" and the
+			// tile size is used as the unit that tiles are built from.
+			if (frame_cfg->tilesize == 16)
+			{
+				frame_cfg->tilesize = 8;
+				frame_cfg->w = 16;
+				frame_cfg->h = 16;
+			}
+			else
+			{
+				frame_cfg->w = 8;
+				frame_cfg->h = 8;
 			}
 			break;
 
@@ -110,7 +126,7 @@ bool conv_validate(Conv *s)
 				frame_cfg->tilesize = 16;
 			}
 
-			if (s->frame_cfg.depth != 4)
+			if (frame_cfg->depth != 4)
 			{
 				fprintf(stderr, "[CONV] CPS only supports 4bpp tile data.\n");
 				return false;
@@ -123,19 +139,38 @@ bool conv_validate(Conv *s)
 				fprintf(stderr, "[CONV] Tilesize %dpx NG)", frame_cfg->tilesize);
 				return false;
 			}
-			if (s->frame_cfg.depth != 4)
+			if (frame_cfg->depth != 4)
 			{
 				fprintf(stderr, "[CONV] CPS only supports 4bpp tile data.\n");
 				return false;
 			}
 			break;
 
+		case DATA_FORMAT_TOA_GCU_SPR:
+			if (frame_cfg->w > 128 || frame_cfg->w > 128)
+			{
+				fprintf(stderr, "[CONV] Max GCU sprite size is 128x128.\n");
+				return false;
+			}
+			[[fallthrough]];
 		case DATA_FORMAT_MD_SPR:
 		case DATA_FORMAT_MD_BG:
+		case DATA_FORMAT_TOA_TXT:
+			if ((frame_cfg->w && frame_cfg->w < 8) ||
+			    (frame_cfg->h && frame_cfg->h < 8))
+			{
+				fprintf(stderr, "[CONV] Frame w/h must be at least the tilesize.\n");
+				return false;
+			}
+			if (frame_cfg->tilesize != 8)
+			{
+				fprintf(stderr, "[CONV] Only 8x8 tiles are supported for this format.\n");
+				return false;
+			}
+			[[fallthrough]];
 		case DATA_FORMAT_MD_CSP:
 		case DATA_FORMAT_MD_CBG:
-		case DATA_FORMAT_TOA_TXT:
-			if (s->frame_cfg.depth != 4)
+			if (frame_cfg->depth != 4)
 			{
 				fprintf(stderr, "[CONV] Only 4bpp tile data is supported for this format.\n");
 				return false;
@@ -274,41 +309,8 @@ bool conv_entry_add(Conv *s)
 	//
 	// Set size and sprite count information.
 	//
-	switch (frame_cfg->data_format)
-	{
-		// Background tiles set the tilesize and "frame" width this way in order
-		// to support interleaved tile order; "tiles" become "frames" and the
-		// tile size is used as the unit that tiles are built from.
-		case DATA_FORMAT_BG038:
-			if (frame_cfg->tilesize > 8)
-			{
-				frame_cfg->tilesize = 8;
-				frame_cfg->w = 16;
-				frame_cfg->h = 16;
-			}
-			break;
 
-		case DATA_FORMAT_MD_SPR:
-			frame_cfg->tilesize = 8;
-			if (frame_cfg->w < 8) frame_cfg->w = 8;
-			else if (frame_cfg->w > 32) frame_cfg->w = 32;
-			if (frame_cfg->h < 8) frame_cfg->h = 8;
-			else if (frame_cfg->h > 32) frame_cfg->h = 32;
-			break;
-		case DATA_FORMAT_MD_BG:
-		case DATA_FORMAT_TOA_TXT:
-			frame_cfg->tilesize = 8;
-			break;
-
-		case DATA_FORMAT_MD_CSP:
-			frame_cfg->tilesize = 8;
-			break;
-
-		default:
-			break;
-	}
-
-	// A size < 0 means the whole image width/height is used.
+	// A size < 0 means the whole image width/height is used for a frame.
 	frame_cfg->src_tex_w = png_w;
 	frame_cfg->src_tex_h = png_h;
 	if (frame_cfg->w <= 0) frame_cfg->w = png_w;
@@ -395,6 +397,11 @@ bool conv_entry_add(Conv *s)
 			}
 			break;
 
+		case DATA_FORMAT_TOA_GCU_SPR:
+			e->gcu_spr.size_code = yoko ? (((frame_tiles_x-1) << 16) | (frame_tiles_y-1))
+			                            : (((frame_tiles_y-1) << 16) | (frame_tiles_x-1));
+			break;
+
 		default:
 			break;
 	}
@@ -447,6 +454,7 @@ bool conv_entry_add(Conv *s)
 				case DATA_FORMAT_CPS_SPR:  // TODO: For CPS SPR, pass in a tile skip flag.
 				case DATA_FORMAT_CPS_BG:
 				case DATA_FORMAT_MD_BG:
+				case DATA_FORMAT_TOA_GCU_SPR:
 					chr_w = tile_read_frame(px,
 					                        png_w, png_h,
 					                        png_src_x, png_src_y,

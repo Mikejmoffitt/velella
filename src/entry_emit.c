@@ -120,6 +120,19 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->md_csp.ref_count);
 			break;
 
+		case DATA_FORMAT_TOA_GCU_SPR:
+			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
+			fprintf(f_inc, "%s%s_CODE_HI %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code >> 16);
+			fprintf(f_inc, "%s%s_CODE_LOW %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code & 0xFFFF);
+			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
+			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
+			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
+			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
+			fprintf(f_inc, "%s%s_SIZE %s%s%02X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->gcu_spr.size_code);
+			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per);
+			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+			break;
+
 		default:
 			break;
 	}
@@ -132,6 +145,7 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 	uint8_t *chr = e->chr;
 	switch (e->frame_cfg.data_format)
 	{
+		// 8bpp as-is
 		case DATA_FORMAT_DIRECT:
 			for (size_t i = 0; i < e->chr_bytes; i++)
 			{
@@ -140,6 +154,7 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 			}
 			break;
 
+		// sp013 special 4bpp/8bpp hybrid
 		case DATA_FORMAT_SP013:
 			for (size_t i = 0; i < e->chr_bytes/2; i++)
 			{
@@ -206,7 +221,7 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 
 		case DATA_FORMAT_CPS_SPR:
 			// spreads across 3-6, we have low 2bpp even tiles, low 2bpp odd tiles, high 2bpp even tiles, high 2bpp odd tiles
-			// 16x16 blocsk at a time, emitted as planar data.
+			// 16x16 blocks at a time, emitted as planar data.
 			// for every 16x16 sprite:
 //			printf("CHR bytes: %lu\n", e->chr_bytes);
 //			printf("16x16 tile count: %lu\n", e->chr_bytes/(16*16));
@@ -246,6 +261,26 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 				const uint8_t lowbyte = ((px0 << 4) & 0xF0) | (px1 & 0x0F);
 
 				fputc(lowbyte, f_chr);
+			}
+			break;
+
+		// 4bpp planar
+		case DATA_FORMAT_TOA_GCU_SPR:
+			for (size_t i = 0; i < (e->chr_bytes)/(8); i++)
+			{
+				const uint8_t *chr_row = &chr[i*8];
+
+				for (size_t plane = 0; plane < 4; plane++)
+				{
+					uint8_t row_out = 0;
+					const uint8_t mask = 1 << plane;
+					for (size_t col = 0; col < 8; col++)
+					{
+						row_out = row_out << 1;
+						if (chr_row[col] & mask) row_out |= 0x01;
+					}
+					fputc(row_out, f_chr);
+				};
 			}
 			break;
 
