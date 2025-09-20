@@ -100,21 +100,6 @@ bool conv_validate(Conv *s)
 				fprintf(stderr, "[CONV] bg038 supports 4bpp or 8bpp tiles.\n");
 				return false;
 			}
-
-			// Background tiles set the tilesize and "frame" width this way in order
-			// to support interleaved tile order; "tiles" become "frames" and the
-			// tile size is used as the unit that tiles are built from.
-			if (frame_cfg->tilesize == 16)
-			{
-				frame_cfg->tilesize = 8;
-				frame_cfg->w = 16;
-				frame_cfg->h = 16;
-			}
-			else
-			{
-				frame_cfg->w = 8;
-				frame_cfg->h = 8;
-			}
 			break;
 
 		case DATA_FORMAT_CPS_SPR:
@@ -123,7 +108,7 @@ bool conv_validate(Conv *s)
 				fprintf(stderr, "[CONV] WARNING: Tilesize %dpx specified, but "
 				        "specified hardware only supports 16px.\n",
 				        frame_cfg->tilesize);
-				frame_cfg->tilesize = 16;
+				return false;
 			}
 
 			if (frame_cfg->depth != 4)
@@ -309,6 +294,20 @@ bool conv_entry_add(Conv *s)
 	//
 	// Set size and sprite count information.
 	//
+	switch (frame_cfg->data_format)
+	{
+		// Background tiles set the tilesize and "frame" width this way in order
+		// to support interleaved tile order; "tiles" become "frames" and the
+		// tile size is used as the unit that tiles are built from.
+		case DATA_FORMAT_BG038:
+			frame_cfg->w = frame_cfg->tilesize;
+			frame_cfg->h = frame_cfg->tilesize;
+			frame_cfg->tilesize = 8;
+			break;
+
+		default:
+			break;
+	}
 
 	// A size < 0 means the whole image width/height is used for a frame.
 	frame_cfg->src_tex_w = png_w;
@@ -462,7 +461,7 @@ bool conv_entry_add(Conv *s)
 					                        frame_cfg->tilesize,
 					                        frame_cfg->angle,
 					                        -1, -1,
-					                        0, chr_w);
+					                        yoko ? 0 : TILE_READ_FLAG_X_MAJOR, chr_w);
 					e->chr_bytes += chr_bytes_per;
 					break;
 					
