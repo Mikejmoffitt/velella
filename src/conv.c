@@ -470,7 +470,7 @@ bool conv_entry_add(Conv *s)
 					                        png_w, png_h,
 					                        png_src_x, png_src_y,
 					                        sw_adj, sh_adj,
-					                        /*tilesize=*/0,
+					                        /*tilesize=*/1,
 					                        frame_cfg->angle,
 					                        -1, -1,
 					                        0,  chr_w);
