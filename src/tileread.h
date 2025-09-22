@@ -113,33 +113,33 @@ static inline uint8_t *tile_read_tile(uint8_t *px_frame, int src_w,
 
 static inline void get_tx_ty(int tile_inner, int tile_inner_count,
                              int tile_outer, int tile_outer_count,
-                             int angle, bool y_major,
+                             int angle, bool x_major,
                              int *tx, int *ty)
 {
-	if (y_major)
+	if (x_major)
 	{
 		switch (angle)
 		{
 			default:
 
 			case 0:
-				*ty = tile_outer;
-				*tx = tile_inner;
+				*ty = tile_inner;
+				*tx = tile_outer;
 				break;
 
 			case 90:
-				*tx = tile_inner_count - 1 - tile_inner;
-				*ty = tile_inner;
+				*tx = tile_outer_count - 1 - tile_outer;
+				*ty = tile_outer;
 				break;
 
 			case 180:
-				*ty = tile_outer_count - 1 - tile_outer;
-				*tx = tile_inner_count - 1 - tile_inner;
+				*ty = tile_inner_count - 1 - tile_inner;
+				*tx = tile_outer_count - 1 - tile_outer;
 				break;
 
 			case 270:
-				*tx = tile_outer;
-				*ty = tile_inner_count - 1 - tile_inner;
+				*tx = tile_inner;
+				*ty = tile_outer_count - 1 - tile_outer;
 				break;
 		}
 	}
@@ -150,23 +150,23 @@ static inline void get_tx_ty(int tile_inner, int tile_inner_count,
 			default:
 
 			case 0:
-				*ty = tile_inner;
-				*tx = tile_outer;
+				*ty = tile_outer;
+				*tx = tile_inner;
 				break;
 
 			case 90:
-				*tx = tile_outer_count - 1 - tile_outer;
-				*ty = tile_outer;
+				*tx = tile_inner_count - 1 - tile_inner;
+				*ty = tile_inner;
 				break;
 
 			case 180:
-				*ty = tile_inner_count - 1 - tile_inner;
-				*tx = tile_outer_count - 1 - tile_outer;
+				*ty = tile_outer_count - 1 - tile_outer;
+				*tx = tile_inner_count - 1 - tile_inner;
 				break;
 
 			case 270:
-				*tx = tile_inner;
-				*ty = tile_outer_count - 1 - tile_outer;
+				*tx = tile_outer;
+				*ty = tile_inner_count - 1 - tile_inner;
 				break;
 		}
 	}
@@ -185,17 +185,29 @@ static inline uint8_t *tile_read_frame(uint8_t *px,
                                        uint32_t flags,
                                        uint8_t *chr_w)
 {
-	const bool yoko = ((angle == 0) || (angle == 180));
+	// TODO: Complain about junk tilesize
+	if (tilesize <= 0) return chr_w;
 
-	const bool x_major = (flags & TILE_READ_FLAG_X_MAJOR) ? true : false;
-	const bool y_major = (yoko && !x_major) || (!yoko && x_major);
-
-	const bool coords_direct = flags &TILE_READ_POS_DIRECT;
+	const bool coords_direct = flags & TILE_READ_POS_DIRECT;
 	const int src_x_coef = coords_direct ? 1 : sw_adj;
 	const int src_y_coef = coords_direct ? 1 : sh_adj;
 
-	const int tile_outer_count = (tilesize <= 0) ? 1 : (((y_major ? sh_adj : sw_adj)/tilesize));
-	const int tile_inner_count = (tilesize <= 0) ? 1 : (((y_major ? sw_adj : sh_adj)/tilesize));
+
+	// Set up tile iteration
+	int tile_outer_count = 0;
+	int tile_inner_count = 0;
+	const bool yoko_angle = (angle == 0 || angle == 180);
+	const bool x_major = flags & TILE_READ_FLAG_X_MAJOR;
+	if ((yoko_angle && !x_major) || (!yoko_angle && x_major))
+	{
+		tile_outer_count = sh_adj / tilesize;
+		tile_inner_count = sw_adj / tilesize;
+	}
+	else
+	{
+		tile_outer_count = sw_adj / tilesize;
+		tile_inner_count = sh_adj / tilesize;
+	}
 
 #ifdef TILEREAD_DEBUG_OUT
 	printf("read (%d, %d) size %d, %d (ts=%d) outer %d inner %d lim %d, %d\n", png_x*src_x_coef, png_y*src_x_coef, sw_adj, sh_adj, tilesize, tile_outer_count, tile_inner_count, lim_x, lim_y);
@@ -208,7 +220,7 @@ static inline uint8_t *tile_read_frame(uint8_t *px,
 			int tx, ty;
 			get_tx_ty(tile_inner, tile_inner_count,
 			          tile_outer, tile_outer_count,
-			          angle, y_major, &tx, &ty);
+			          angle, x_major, &tx, &ty);
 
 			const int src_y = ((png_y * src_y_coef) + (ty * tilesize));
 			const int src_x = ((png_x * src_x_coef) + (tx * tilesize));
