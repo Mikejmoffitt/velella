@@ -61,6 +61,25 @@ uint16_t pal_pack_entry(PalFormat fmt, uint8_t r, uint8_t g, uint8_t b)
 			b = b >> 3;
 			return (g << 5) | (b << 10) | r;
 
+		case PAL_FORMAT_NEO:
+			{
+				// Logic taken from the neo geo development wiki. What in the world
+				const int luma = (int)(((54.213f*r) + (182.376f*g) + (18.411f*b))) & 1;
+				r = r >> 3;
+				g = g >> 3;
+				b = b >> 3;
+
+				return (luma ? 0x0000 : 0x8000) | 
+				       ((r & 0x01) << 14) |
+				       ((g & 0x01) << 13) |
+				       ((b & 0x01) << 12) |
+				       ((r >> 1) << 8) |
+				       ((g >> 1) << 4) |
+				       ((b >> 1));
+				// TODO: Considerations for the dark bit
+			}
+			break;
+
 		default:
 			fprintf(stderr, "[pal] Unhandled palette type %d\n", fmt);
 			return 0;

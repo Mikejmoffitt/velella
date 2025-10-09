@@ -155,6 +155,8 @@ bool conv_validate(Conv *s)
 			[[fallthrough]];
 		case DATA_FORMAT_MD_CSP:
 		case DATA_FORMAT_MD_CBG:
+		case DATA_FORMAT_NEO_SPR:
+		case DATA_FORMAT_NEO_CSPR:
 			if (frame_cfg->depth != 4)
 			{
 				fprintf(stderr, "[CONV] Only 4bpp tile data is supported for this format.\n");
@@ -175,7 +177,7 @@ bool conv_validate(Conv *s)
 
 	if (frame_cfg->tilesize <= 0 || (frame_cfg->tilesize % 8 != 0))
 	{
-		fprintf(stderr, "[CONV] WARNING: Tilesize %d NG; defaulting to 16\n",
+		fprintf(stderr, "[CONV] Tilesize %d not a power of twoNG; defaulting to 16\n",
 		        frame_cfg->tilesize);
 		frame_cfg->tilesize = 16;
 	}
