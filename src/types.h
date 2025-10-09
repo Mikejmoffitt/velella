@@ -52,6 +52,9 @@ typedef struct MdCspSpr
 	int16_t flip_dx, flip_dy;
 } MdCspSpr;
 
+// Neo Geo sprite struct.
+typedef struct MdNeo
+
 typedef struct Entry Entry;
 struct Entry
 {
@@ -97,6 +100,14 @@ struct Entry
 	{
 		uint32_t size_code;  // X in the upper word.
 	} gcu_spr;
+	struct
+	{
+		// each bit represents a tile within a vertical strip that can be skipped.
+		// the index within the table is the X sprite index.
+		// this gives a maximum sprite width of 512px.
+		uint32_t skip_tbl[32];
+		uint32_t start_tile_idx;
+	} neo_cspr;
 
 	// The bitmap data.
 	uint8_t *chr;
