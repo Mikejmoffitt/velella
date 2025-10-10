@@ -291,15 +291,20 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 
 		// Linear, in a funny order
 		case DATA_FORMAT_NEO_FIX:
-			for (size_t i = 0; i < e->chr_bytes/(8*8*4)/8; i++)
+			for (size_t i = 0; i < e->chr_bytes/(8*8); i++)
 			{
-				const uint8_t *chr_tile = &chr[i*(8*8*4)/8];
-				for (int row = 0; row < 8; row++)
+				const uint8_t *chr_tile = &chr[i*8*8];
+				static const int column_pair_order_tbl[4] = {2, 3, 0, 1};
+				for (int colset = 0; colset < 4; colset++)
 				{
-					const uint8_t *chr_row = &chr_tile[row*8];
-					uint8_t row_buffer[8] = { 0 };
-					pxutil_pack_linear(chr_row, 4, false, row_buffer);
-					fwrite(row_buffer, 1, 4, f_chr);
+					for (int row = 0; row < 8; row++)
+					{
+						const int source_x_offset = column_pair_order_tbl[colset]*2;
+
+						const uint8_t px_lo = (chr_tile[(row*8) + source_x_offset +1] & 0xF) << 4;
+						const uint8_t px_hi = (chr_tile[(row*8) + source_x_offset] & 0xF);
+						fputc(px_lo | px_hi, f_chr);
+					}
 				}
 			}
 			break;
