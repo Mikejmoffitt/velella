@@ -10,6 +10,7 @@ static const char *kstr_for_formats[PAL_FORMAT_COUNT] =
 	[PAL_FORMAT_MD] = "md",
 	[PAL_FORMAT_CPS] = "cps",
 	[PAL_FORMAT_TOA] = "toa",
+	[PAL_FORMAT_NEO] = "neo",
 };
 
 bool pal_validate_selection(PalFormat fmt)

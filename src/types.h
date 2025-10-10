@@ -52,9 +52,6 @@ typedef struct MdCspSpr
 	int16_t flip_dx, flip_dy;
 } MdCspSpr;
 
-// Neo Geo sprite struct.
-typedef struct MdNeo
-
 typedef struct Entry Entry;
 struct Entry
 {

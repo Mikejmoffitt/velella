@@ -4,6 +4,7 @@
 #include <string.h>
 #include "endian.h"
 #include "mdcsp_mapping.h"
+#include "pxutil.h"
 
 void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 {
@@ -48,10 +49,11 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
 			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);  // whereas the "frame" is used to chop major tiles
-			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->w);
+			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->h);
 			break;
 
 		case DATA_FORMAT_DIRECT:
+			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
 			fprintf(f_inc, "%s%s_DATA_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*frame_cfg->src_tex_w*frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->w*frame_cfg->h);
 			fprintf(f_inc, "%s%s_TILE_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->tilesize*frame_cfg->tilesize);
@@ -78,10 +80,11 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
 			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);  // whereas the "frame" is used to chop major tiles
-			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->w);
+			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->h);
 			break;
 
 		case DATA_FORMAT_MD_SPR:
+			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
 			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
 			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
 			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
@@ -96,6 +99,8 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 
 		case DATA_FORMAT_MD_BG:
 		case DATA_FORMAT_TOA_TXT:
+		case DATA_FORMAT_NEO_FIX:
+			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
 			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
 			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
 			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
@@ -103,12 +108,12 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
 			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
-			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);  // whereas the "frame" is used to chop major tiles
-			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->w);
+			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);
+			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->h);
 			break;
 
 		case DATA_FORMAT_MD_CSP:
+			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
 			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
 			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
 			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
@@ -281,6 +286,21 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 					}
 					fputc(row_out, f_chr);
 				};
+			}
+			break;
+
+		// Linear, in a funny order
+		case DATA_FORMAT_NEO_FIX:
+			for (size_t i = 0; i < e->chr_bytes/(8*8*4)/8; i++)
+			{
+				const uint8_t *chr_tile = &chr[i*(8*8*4)/8];
+				for (int row = 0; row < 8; row++)
+				{
+					const uint8_t *chr_row = &chr_tile[row*8];
+					uint8_t row_buffer[8] = { 0 };
+					pxutil_pack_linear(chr_row, 4, false, row_buffer);
+					fwrite(row_buffer, 1, 4, f_chr);
+				}
 			}
 			break;
 

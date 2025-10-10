@@ -19,9 +19,9 @@ typedef enum DataFormat
 	DATA_FORMAT_MD_CBG,      // Megadrive composite background data.
 	DATA_FORMAT_TOA_TXT,     // Toaplan text tilemap layer.
 	DATA_FORMAT_TOA_GCU_SPR, // Toaplan GCU sprites.
+	DATA_FORMAT_NEO_FIX,     // Neo-Geo FIX layer.
 	DATA_FORMAT_NEO_SPR,     // Neo-Geo sprites (direct).
 	DATA_FORMAT_NEO_CSPR,    // Neo-Geo sprites (composite).
-	DATA_FORMAT_NEO_FIX,     // Neo-Geo FIX layer.
 	DATA_FORMAT_COUNT
 } DataFormat;
 

@@ -155,6 +155,7 @@ bool conv_validate(Conv *s)
 			[[fallthrough]];
 		case DATA_FORMAT_MD_CSP:
 		case DATA_FORMAT_MD_CBG:
+		case DATA_FORMAT_NEO_FIX:
 		case DATA_FORMAT_NEO_SPR:
 		case DATA_FORMAT_NEO_CSPR:
 			if (frame_cfg->depth != 4)
@@ -376,6 +377,7 @@ bool conv_entry_add(Conv *s)
 				free(px);
 				return false;
 			}
+			// code_per is set at each iteration of the sprite claim routine.
 			break;
 
 		// Composite background (optimized tilemap and chr data) does the fofllowing
@@ -396,6 +398,7 @@ bool conv_entry_add(Conv *s)
 				free(px);
 				return false;
 			}
+			// code_per is set at each iteration of the sprite claim routine.
 			break;
 
 		case DATA_FORMAT_TOA_GCU_SPR:
@@ -481,6 +484,7 @@ bool conv_entry_add(Conv *s)
 
 				case DATA_FORMAT_MD_SPR:
 				case DATA_FORMAT_TOA_TXT:
+				case DATA_FORMAT_NEO_FIX:
 					chr_w = tile_read_frame(px,
 					                        png_w, png_h,
 					                        png_src_x, png_src_y,
@@ -605,6 +609,8 @@ bool conv_entry_add(Conv *s)
 						ref->spr_index = base_spr_index;
 						ref->tile_index = base_tile_index;
 						ref->tile_count = tiles_for_sprite;
+
+						e->code_per = tiles_for_sprite;
 
 						e->md_csp.ref_count++;
 
