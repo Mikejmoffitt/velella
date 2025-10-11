@@ -73,6 +73,10 @@ int ini_handler_func(void *user, const char *section, const char *name, const ch
 			return 0;
 		}
 	}
+	else if (strcmp("center", name) == 0)
+	{
+		s->frame_cfg.center = strtoul(value, NULL, 0) ? true : false;
+	}
 	else
 	{
 		printf("WARNING: Unhandled directive \"%s\"\n", name);

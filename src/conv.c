@@ -402,8 +402,50 @@ bool conv_entry_add(Conv *s)
 			break;
 
 		case DATA_FORMAT_TOA_GCU_SPR:
-			e->gcu_spr.size_code = yoko ? (((frame_tiles_x-1) << 16) | (frame_tiles_y-1))
-			                            : (((frame_tiles_y-1) << 16) | (frame_tiles_x-1));
+			// As the GCU has fixed point positioning and the size code has
+			// unused upper bits, there is a clever techinque Toaplan employed
+			// to bake centering offset information into the size code.
+			// The resulting value can just be added to the X and Y positions.
+			if (frame_cfg->center)
+			{
+				uint16_t widthcode = yoko ? (frame_tiles_x-1) : (frame_tiles_y-1);
+				uint16_t heightcode = yoko ? (frame_tiles_y-1) : (frame_tiles_x-1);
+				const int16_t offs_x = yoko ? (((frame_tiles_x*8)/2)*128) : (((frame_tiles_y*8)/2)*128);
+				const int16_t offs_y = yoko ? (((frame_tiles_y*8)/2)*128) : (((frame_tiles_x*8)/2)*128);
+				uint16_t code_x;
+				uint16_t code_y;
+
+				switch (frame_cfg->angle)
+				{
+					default:
+					case 0:
+						code_x = -offs_x | widthcode;
+						code_y = -offs_y | heightcode;
+						break;
+
+					case 90:
+						code_y = offs_x | widthcode;
+						code_x = offs_y | heightcode;
+						break;
+
+					case 180:
+						code_x = offs_x | widthcode;
+						code_y = offs_y | heightcode;
+						break;
+
+					case 270:
+						code_y = -offs_x | widthcode;
+						code_x = -offs_y | heightcode;
+						break;
+				}
+				e->gcu_spr.size_code = (code_x<<16) | code_y;
+				
+			}
+			else
+			{
+				e->gcu_spr.size_code = yoko ? (((frame_tiles_x-1) << 16) | (frame_tiles_y-1))
+				                            : (((frame_tiles_y-1) << 16) | (frame_tiles_x-1));
+			}
 			break;
 
 		default:

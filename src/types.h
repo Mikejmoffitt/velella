@@ -26,6 +26,7 @@ typedef struct FrameCfg
 	int depth;                 // Bits per pixel.
 	PalFormat pal_format;
 	DataFormat data_format;
+	bool center;               // If true, metadata centers sprite position.
 	
 } FrameCfg;
 
