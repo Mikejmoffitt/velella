@@ -1,6 +1,7 @@
 #include "conv.h"
 #include "pal.h"
 #include "tileread.h"
+#include "tile.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -459,6 +460,7 @@ bool conv_entry_add(Conv *s)
 				case DATA_FORMAT_CPS_BG:
 				case DATA_FORMAT_MD_BG:
 				case DATA_FORMAT_TOA_GCU_SPR:
+				case DATA_FORMAT_NEO_FIX:
 					chr_w = tile_read_frame(px,
 					                        png_w, png_h,
 					                        png_src_x, png_src_y,
@@ -484,7 +486,6 @@ bool conv_entry_add(Conv *s)
 
 				case DATA_FORMAT_MD_SPR:
 				case DATA_FORMAT_TOA_TXT:
-				case DATA_FORMAT_NEO_FIX:
 					chr_w = tile_read_frame(px,
 					                        png_w, png_h,
 					                        png_src_x, png_src_y,
@@ -670,6 +671,7 @@ void conv_shutdown(Conv *s)
 	{
 		if (e->chr) free(e->chr);
 		Entry *next = e->next;
+		tile_list_shutdown(e->tile_list);
 		free(e);
 		e = next;
 	}

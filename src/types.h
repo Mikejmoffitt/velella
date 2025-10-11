@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include "format.h"
 #include "pal.h"
+#include "tile.h"
 
 //
 // Conversion entry data.
@@ -24,6 +25,7 @@ typedef struct FrameCfg
 	uint32_t code;             // Starting code in graphics memory.
 	int tilesize;              // Size of one tile.
 	int depth;                 // Bits per pixel.
+	TileOptLevel tile_opt;     // Optimization config.
 	PalFormat pal_format;
 	DataFormat data_format;
 	
@@ -104,9 +106,11 @@ struct Entry
 		// this gives a maximum sprite width of 512px.
 		uint32_t skip_tbl[32];
 		uint32_t start_tile_idx;
+		
 	} neo_cspr;
 
 	// The bitmap data.
+	TileList tile_list;
 	uint8_t *chr;
 	size_t chr_offs;
 	size_t chr_bytes;
