@@ -6,14 +6,104 @@
 #include "mdcsp_mapping.h"
 #include "pxutil.h"
 
+static const char *get_str_comment(bool c_lang)
+{
+	return c_lang ? "//" : "; ";
+}
+
+static const char *get_str_hex(bool c_lang)
+{
+	return c_lang ? "0x" : "$ ";
+}
+
+static const char *get_str_def(bool c_lang)
+{
+	return c_lang ? "#define " : "";
+}
+
+static const char *get_str_equ(bool c_lang)
+{
+	return c_lang ? "" : "= ";
+}
+
+static inline void emit_code(const Entry *e, bool c_lang, const char *suffix, uint32_t data, FILE *f)
+{
+	fprintf(f, "%s%s_CODE%s %s%s%X\n",
+	        get_str_def(c_lang),
+	        e->symbol_upper, suffix,
+	        get_str_equ(c_lang),
+	        get_str_hex(c_lang), data);
+}
+
+static inline void emit_frame_size(const Entry *e, bool c_lang, FILE *f)
+{
+	const FrameCfg *frame_cfg = &e->frame_cfg;
+	const char *k_str_def = get_str_def(c_lang);
+	const char *k_str_equ = get_str_equ(c_lang);
+	fprintf(f, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
+	fprintf(f, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
+}
+
+static inline void emit_src_tex_size(const Entry *e, bool c_lang, FILE *f)
+{
+	const FrameCfg *frame_cfg = &e->frame_cfg;
+	const char *k_str_def = get_str_def(c_lang);
+	const char *k_str_equ = get_str_equ(c_lang);
+	fprintf(f, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
+	fprintf(f, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
+}
+
+static inline void emit_tile_count(const Entry *e, bool c_lang, FILE *f)
+{
+	const FrameCfg *frame_cfg = &e->frame_cfg;
+	const char *k_str_def = get_str_def(c_lang);
+	const char *k_str_equ = get_str_equ(c_lang);
+	// "Tilesize" refers to the conversion perspectivem, whereas the "frame" is used to chop major tiles.
+	fprintf(f, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
+	fprintf(f, "%s%s_TILES_W %s%d\n",  k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);
+	fprintf(f, "%s%s_TILES_H %s%d\n",  k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->h);
+}
+
+static inline void emit_frame_metrics(const Entry *e, bool c_lang, uint32_t frame_offs, FILE *f)
+{
+	const FrameCfg *frame_cfg = &e->frame_cfg;
+	const char *k_str_def = get_str_def(c_lang);
+	const char *k_str_equ = get_str_equ(c_lang);
+	const char *k_str_hex = get_str_hex(c_lang);
+	if (frame_offs > 1)
+	{
+		fprintf(f, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_offs);
+	}
+	fprintf(f, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+}
+
+static inline void emit_chr_metrics(const Entry *e, bool c_lang, FILE *f)
+{
+	const FrameCfg *frame_cfg = &e->frame_cfg;
+	const char *k_str_def = get_str_def(c_lang);
+	const char *k_str_equ = get_str_equ(c_lang);
+	const char *k_str_hex = get_str_hex(c_lang);
+	fprintf(f, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
+	fprintf(f, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
+	fprintf(f, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
+}
+
+static inline void emit_size(const Entry *e, bool c_lang, uint32_t size_code, FILE *f)
+{
+	const char *k_str_def = get_str_def(c_lang);
+	const char *k_str_equ = get_str_equ(c_lang);
+	const char *k_str_hex = get_str_hex(c_lang);
+	fprintf(f, "%s%s_SIZE %s%s%04X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, size_code);
+}
+
 void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 {
 	const FrameCfg *frame_cfg = &e->frame_cfg;
 
-	const char *k_str_comment = c_lang ? "//" : "; ";
-	const char *k_str_hex = c_lang ? "0x" : "$";
-	const char *k_str_def = c_lang ? "#define " : "";
-	const char *k_str_equ = c_lang ? "" : "= ";
+	const char *k_str_comment = get_str_comment(c_lang);
+	const char *k_str_def = get_str_def(c_lang);
+	const char *k_str_equ = get_str_equ(c_lang);
+	const char *k_str_hex = get_str_hex(c_lang);
 
 	// Write inc entry
 	fprintf(f_inc, "%s Entry $%03X \"%s\": format \"%s\" %d x %d, %d frames/tiles\n",
@@ -26,116 +116,93 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 	switch (e->frame_cfg.data_format)
 	{
 		case DATA_FORMAT_SP013:
-			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
-			fprintf(f_inc, "%s%s_CODE_HI %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code >> 16);
-			fprintf(f_inc, "%s%s_CODE_LOW %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code & 0xFFFF);
-			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
-			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
-			fprintf(f_inc, "%s%s_SIZE %s%s%04X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->sp013.size_code);
-			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per);
-			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+			emit_code(e,               c_lang, "",    frame_cfg->code, f_inc);
+			emit_code(e,               c_lang, "_HI", frame_cfg->code >> 16, f_inc);
+			emit_code(e,               c_lang, "_LO", frame_cfg->code & 0xFFFF, f_inc);
+			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_frame_size(e,         c_lang, f_inc);
+			emit_size(e,               c_lang, e->sp013.size_code, f_inc);
+			emit_frame_metrics(e,      c_lang, e->code_per, f_inc);
 			break;
 
 		case DATA_FORMAT_BG038:
-			fprintf(f_inc, "%s%s_CODE8 %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
-			fprintf(f_inc, "%s%s_CODE8_HI %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code >> 16);
-			fprintf(f_inc, "%s%s_CODE8_LOW %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code & 0xFFFF);
-			fprintf(f_inc, "%s%s_CODE16 %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code / 4);
-			fprintf(f_inc, "%s%s_CODE16_HI %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (frame_cfg->code / 4) >> 16);
-			fprintf(f_inc, "%s%s_CODE16_LOW %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (frame_cfg->code / 4) & 0xFFFF);
-			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
-			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);  // whereas the "frame" is used to chop major tiles
-			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->h);
+			emit_code(e,               c_lang, "8",    frame_cfg->code, f_inc);
+			emit_code(e,               c_lang, "8_HI", frame_cfg->code >> 16, f_inc);
+			emit_code(e,               c_lang, "8_LO", frame_cfg->code & 0xFFFF, f_inc);
+			emit_code(e,               c_lang, "16",   (frame_cfg->code>>2), f_inc);
+			emit_code(e,               c_lang, "16_HI",(frame_cfg->code>>2) >> 16, f_inc);
+			emit_code(e,               c_lang, "16_LO",(frame_cfg->code>>2) & 0xFFFF, f_inc);
+			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_tile_count(e,         c_lang, f_inc);
 			break;
 
 		case DATA_FORMAT_DIRECT:
-			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
-			fprintf(f_inc, "%s%s_DATA_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*frame_cfg->src_tex_w*frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->w*frame_cfg->h);
+			emit_code(e,               c_lang, "", frame_cfg->code, f_inc);
+			emit_chr_metrics(e,        c_lang, f_inc);
+//			fprintf(f_inc, "%s%s_DATA_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*frame_cfg->src_tex_w*frame_cfg->src_tex_h);
+
 			fprintf(f_inc, "%s%s_TILE_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->tilesize*frame_cfg->tilesize);
-			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
-			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
-			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+			emit_frame_size(e,         c_lang, f_inc);
+			emit_frame_metrics(e,      c_lang, frame_cfg->w*frame_cfg->h, f_inc);
 			break;
 
 		case DATA_FORMAT_CPS_SPR:
-			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
-			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
-			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
-			fprintf(f_inc, "%s%s_SIZE %s%s%02X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->cps_spr.size_code);
-			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per);
-			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+			emit_code(e,               c_lang,"",  frame_cfg->code, f_inc);
+			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_frame_size(e,         c_lang, f_inc);
+			emit_size(e,               c_lang, e->cps_spr.size_code, f_inc);
+			emit_frame_metrics(e,      c_lang, e->code_per, f_inc);
 			break;
 
 		case DATA_FORMAT_CPS_BG:
 			// The code is doubled for 8x8 tiles because they're basically internally padded due to the CPS architecture.
-			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code*((e->frame_cfg.tilesize == 8) ? 2 : 1));
-			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s%s_TILESIZE %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);  // "Tilesize" refers to the conversion perspective
-			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);  // whereas the "frame" is used to chop major tiles
-			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->h);
+			emit_code(e,               c_lang,"",  frame_cfg->code*((e->frame_cfg.tilesize == 8) ? 2 : 1), f_inc);
+			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_tile_count(e,         c_lang, f_inc);
 			break;
 
 		case DATA_FORMAT_MD_SPR:
-			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
-			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
-			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
-			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
-			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
-			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
-			fprintf(f_inc, "%s%s_SIZE %s%s%02X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->md_spr.size_code);
-			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per);
-			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+			emit_code(e,               c_lang,"",  frame_cfg->code, f_inc);
+			emit_chr_metrics(e,        c_lang, f_inc);
+			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_frame_size(e,         c_lang, f_inc);
+			emit_size(e,               c_lang, e->md_spr.size_code, f_inc);
+			emit_frame_metrics(e,      c_lang, e->code_per, f_inc);
 			break;
 
 		case DATA_FORMAT_MD_BG:
 		case DATA_FORMAT_TOA_TXT:
 		case DATA_FORMAT_NEO_FIX:
-			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
-			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
-			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
-			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
-			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s%s_TILES_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w / frame_cfg->w);
-			fprintf(f_inc, "%s%s_TILES_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h / frame_cfg->h);
+			emit_code(e,               c_lang, "", frame_cfg->code, f_inc);
+			emit_chr_metrics(e,        c_lang, f_inc);
+			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_frame_size(e,         c_lang, f_inc);
+			emit_tile_count(e,         c_lang, f_inc);
 			break;
 
 		case DATA_FORMAT_MD_CSP:
-			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
-			fprintf(f_inc, "%s%s_CHR_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_offs);
-			fprintf(f_inc, "%s%s_CHR_BYTES %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/2);
-			fprintf(f_inc, "%s%s_CHR_WORDS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->chr_bytes/4);
-			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
+			emit_code(e,               c_lang, "",  frame_cfg->code, f_inc);
+			emit_chr_metrics(e,        c_lang, f_inc);
+			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_frame_size(e,         c_lang, f_inc);
 			fprintf(f_inc, "%s%s_MAP_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, (uint32_t)e->map_offs);
-			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
-			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
-			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->md_csp.ref_count);
+			emit_frame_metrics(e,      c_lang, 0, f_inc);
 			break;
 
 		case DATA_FORMAT_TOA_GCU_SPR:
-			fprintf(f_inc, "%s%s_CODE %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code);
-			fprintf(f_inc, "%s%s_CODE_HI %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code >> 16);
-			fprintf(f_inc, "%s%s_CODE_LOW %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_cfg->code & 0xFFFF);
-			fprintf(f_inc, "%s%s_SRC_TEX_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_w);
-			fprintf(f_inc, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
-			fprintf(f_inc, "%s%s_W %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w);
-			fprintf(f_inc, "%s%s_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h);
-			fprintf(f_inc, "%s%s_SIZE %s%s%02X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->gcu_spr.size_code);
-			fprintf(f_inc, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, e->code_per);
-			fprintf(f_inc, "%s%s_FRAMES %s%d\n", k_str_def, e->symbol_upper, k_str_equ, e->frames);
+			emit_code(e,               c_lang, "",    frame_cfg->code, f_inc);
+			emit_code(e,               c_lang, "_HI", frame_cfg->code >> 16, f_inc);
+			emit_code(e,               c_lang, "_LO", frame_cfg->code & 0xFFFF, f_inc);
+			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_frame_size(e,         c_lang, f_inc);
+			emit_size(e,               c_lang, e->gcu_spr.size_code, f_inc);
+			emit_frame_metrics(e,      c_lang, e->code_per, f_inc);
+			break;
+
+		case DATA_FORMAT_TOA_GCU_BG:
+			emit_code(e,               c_lang, "",    frame_cfg->code>>2, f_inc);
+			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_tile_count(e,         c_lang, f_inc);
 			break;
 
 		default:
@@ -271,6 +338,7 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 
 		// 4bpp planar
 		case DATA_FORMAT_TOA_GCU_SPR:
+		case DATA_FORMAT_TOA_GCU_BG:
 			for (size_t i = 0; i < (e->chr_bytes)/(8); i++)
 			{
 				const uint8_t *chr_row = &chr[i*8];

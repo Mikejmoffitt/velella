@@ -16,6 +16,7 @@ static const char *kstring_for_data_format[DATA_FORMAT_COUNT] =
 	[DATA_FORMAT_MD_CBG]      = "md_cbg",
 	[DATA_FORMAT_TOA_TXT]     = "toa_txt",
 	[DATA_FORMAT_TOA_GCU_SPR] = "toa_gcu_spr",
+	[DATA_FORMAT_TOA_GCU_BG]  = "toa_gcu_bg",
 	[DATA_FORMAT_NEO_FIX]     = "neo_fix",
 	[DATA_FORMAT_NEO_SPR]     = "neo_spr",
 	[DATA_FORMAT_NEO_CSPR]    = "neo_cspr",

@@ -28,6 +28,7 @@ typedef struct FrameCfg
 	TileOptLevel tile_opt;     // Optimization config.
 	PalFormat pal_format;
 	DataFormat data_format;
+	bool center;               // If true, metadata centers sprite position.
 	
 } FrameCfg;
 
