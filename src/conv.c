@@ -131,6 +131,14 @@ bool conv_validate(Conv *s)
 			}
 			break;
 
+		case DATA_FORMAT_TOA_GCU_BG:
+			if (frame_cfg->tilesize != 16)
+			{
+				fprintf(stderr, "[CONV] GCU background only supports 16x16 tiles.n");
+				return false;
+			}
+			break;
+
 		case DATA_FORMAT_TOA_GCU_SPR:
 			if (frame_cfg->w > 128 || frame_cfg->w > 128)
 			{
@@ -307,6 +315,11 @@ bool conv_entry_add(Conv *s)
 			frame_cfg->h = frame_cfg->tilesize;
 			frame_cfg->tilesize = 8;
 			break;
+
+		case DATA_FORMAT_TOA_GCU_BG:
+			frame_cfg->w = frame_cfg->tilesize;
+			frame_cfg->h = frame_cfg->tilesize;
+			frame_cfg->tilesize = 8;
 
 		default:
 			break;
@@ -501,6 +514,7 @@ bool conv_entry_add(Conv *s)
 				case DATA_FORMAT_CPS_BG:
 				case DATA_FORMAT_MD_BG:
 				case DATA_FORMAT_TOA_GCU_SPR:
+				case DATA_FORMAT_TOA_GCU_BG:
 					chr_w = tile_read_frame(px,
 					                        png_w, png_h,
 					                        png_src_x, png_src_y,
