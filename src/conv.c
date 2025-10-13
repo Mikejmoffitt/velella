@@ -164,8 +164,20 @@ bool conv_validate(Conv *s)
 		case DATA_FORMAT_MD_CSP:
 		case DATA_FORMAT_MD_CBG:
 		case DATA_FORMAT_NEO_FIX:
+			if (frame_cfg->depth != 4)
+			{
+				fprintf(stderr, "[CONV] Only 4bpp tile data is supported for this format.\n");
+				return false;
+			}
+			break;
+
 		case DATA_FORMAT_NEO_SPR:
 		case DATA_FORMAT_NEO_CSPR:
+			if (frame_cfg->tilesize != 16)
+			{
+				fprintf(stderr, "[CONV] Only 16x16 tiles are supported for this format.\n");
+				return false;
+			}
 			if (frame_cfg->depth != 4)
 			{
 				fprintf(stderr, "[CONV] Only 4bpp tile data is supported for this format.\n");
@@ -186,7 +198,7 @@ bool conv_validate(Conv *s)
 
 	if (frame_cfg->tilesize <= 0 || (frame_cfg->tilesize % 8 != 0))
 	{
-		fprintf(stderr, "[CONV] Tilesize %d not a power of twoNG; defaulting to 16\n",
+		fprintf(stderr, "[CONV] Tilesize %d not a power of two; defaulting to 16\n",
 		        frame_cfg->tilesize);
 		frame_cfg->tilesize = 16;
 	}
@@ -508,6 +520,7 @@ bool conv_entry_add(Conv *s)
 
 			switch (frame_cfg->data_format)
 			{
+				// Y Major standard formats.
 				case DATA_FORMAT_DIRECT:
 				case DATA_FORMAT_BG038:
 				case DATA_FORMAT_CPS_SPR:  // TODO: For CPS SPR, pass in a tile skip flag.
@@ -525,7 +538,24 @@ bool conv_entry_add(Conv *s)
 					                        0, chr_w);
 					e->chr_bytes += chr_bytes_per;
 					break;
-					
+
+				// X Major standard formats.
+				case DATA_FORMAT_MD_SPR:
+				case DATA_FORMAT_TOA_TXT:
+				case DATA_FORMAT_NEO_FIX:
+				case DATA_FORMAT_NEO_SPR:
+					chr_w = tile_read_frame(px,
+					                        png_w, png_h,
+					                        png_src_x, png_src_y,
+					                        sw_adj, sh_adj,
+					                        frame_cfg->tilesize,
+					                        frame_cfg->angle,
+					                        -1, -1,
+					                        TILE_READ_FLAG_X_MAJOR, chr_w);
+					e->chr_bytes += chr_bytes_per;
+					break;
+				
+				// Unusual line-based system
 				case DATA_FORMAT_SP013:
 					chr_w = tile_read_frame(px,
 					                        png_w, png_h,
@@ -538,20 +568,7 @@ bool conv_entry_add(Conv *s)
 					e->chr_bytes += chr_bytes_per;
 					break;
 
-				case DATA_FORMAT_MD_SPR:
-				case DATA_FORMAT_TOA_TXT:
-				case DATA_FORMAT_NEO_FIX:
-					chr_w = tile_read_frame(px,
-					                        png_w, png_h,
-					                        png_src_x, png_src_y,
-					                        sw_adj, sh_adj,
-					                        frame_cfg->tilesize,
-					                        frame_cfg->angle,
-					                        -1, -1,
-					                        TILE_READ_FLAG_X_MAJOR, chr_w);
-					e->chr_bytes += chr_bytes_per;
-					break;
-
+				// Composite sprite (optimized with mapping) format(s)
 				case DATA_FORMAT_MD_CSP:
 					// This is mostly a rewrite of claim() from png2csp.
 					{

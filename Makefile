@@ -5,8 +5,7 @@ MKDIR := mkdir
 RM := rm
 CC := gcc
 CFLAGS := -Wall -Wpedantic -Werror -std=c23
-CFLAGS := -O0 -g
-# CFLAGS := -O3
+CFLAGS := -O3
 INSTALL_PREFIX := /usr/bin
 ifdef SYSTEMROOT
 	APPEXT := .exe

@@ -53,7 +53,7 @@ static inline void emit_src_tex_size(const Entry *e, bool c_lang, FILE *f)
 	fprintf(f, "%s%s_SRC_TEX_H %s%d\n", k_str_def, e->symbol_upper, k_str_equ, frame_cfg->src_tex_h);
 }
 
-static inline void emit_tile_count(const Entry *e, bool c_lang, FILE *f)
+static inline void emit_tile_count_bg(const Entry *e, bool c_lang, FILE *f)
 {
 	const FrameCfg *frame_cfg = &e->frame_cfg;
 	const char *k_str_def = get_str_def(c_lang);
@@ -133,7 +133,7 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			emit_code(e,               c_lang, "16_HI",(frame_cfg->code>>2) >> 16, f_inc);
 			emit_code(e,               c_lang, "16_LO",(frame_cfg->code>>2) & 0xFFFF, f_inc);
 			emit_src_tex_size(e,       c_lang, f_inc);
-			emit_tile_count(e,         c_lang, f_inc);
+			emit_tile_count_bg(e,      c_lang, f_inc);
 			break;
 
 		case DATA_FORMAT_DIRECT:
@@ -158,7 +158,7 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			// The code is doubled for 8x8 tiles because they're basically internally padded due to the CPS architecture.
 			emit_code(e,               c_lang,"",  frame_cfg->code*((e->frame_cfg.tilesize == 8) ? 2 : 1), f_inc);
 			emit_src_tex_size(e,       c_lang, f_inc);
-			emit_tile_count(e,         c_lang, f_inc);
+			emit_tile_count_bg(e,      c_lang, f_inc);
 			break;
 
 		case DATA_FORMAT_MD_SPR:
@@ -177,7 +177,7 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			emit_chr_metrics(e,        c_lang, f_inc);
 			emit_src_tex_size(e,       c_lang, f_inc);
 			emit_frame_size(e,         c_lang, f_inc);
-			emit_tile_count(e,         c_lang, f_inc);
+			emit_tile_count_bg(e,      c_lang, f_inc);
 			break;
 
 		case DATA_FORMAT_MD_CSP:
@@ -202,7 +202,18 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 		case DATA_FORMAT_TOA_GCU_BG:
 			emit_code(e,               c_lang, "",    frame_cfg->code>>2, f_inc);
 			emit_src_tex_size(e,       c_lang, f_inc);
-			emit_tile_count(e,         c_lang, f_inc);
+			emit_tile_count_bg(e,      c_lang, f_inc);
+			break;
+
+		case DATA_FORMAT_NEO_SPR:
+			emit_code(e,               c_lang, "",    frame_cfg->code, f_inc);
+			emit_code(e,               c_lang, "_MSB", frame_cfg->code >> 16, f_inc);
+			emit_code(e,               c_lang, "_MSB_ATTR", (frame_cfg->code >> 16) << 4, f_inc);
+			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_frame_size(e,         c_lang, f_inc);
+			fprintf(f_inc, "%s%s_TILES_W %s%d\n",  k_str_def, e->symbol_upper, k_str_equ, frame_cfg->w / frame_cfg->tilesize);
+			fprintf(f_inc, "%s%s_TILES_H %s%d\n",  k_str_def, e->symbol_upper, k_str_equ, frame_cfg->h / frame_cfg->tilesize);
+			emit_frame_metrics(e,      c_lang, e->code_per, f_inc);
 			break;
 
 		default:
@@ -372,6 +383,24 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 						const uint8_t px_lo = (chr_tile[(row*8) + source_x_offset +1] & 0xF) << 4;
 						const uint8_t px_hi = (chr_tile[(row*8) + source_x_offset] & 0xF);
 						fputc(px_lo | px_hi, f_chr);
+					}
+				}
+			}
+			break;
+
+		// Planar
+		case DATA_FORMAT_NEO_SPR:
+			for (size_t i = 0; i < e->chr_bytes/(16*16); i++)  // per tile
+			{
+				const uint8_t *chr_tile16 = &chr[i*16*16];
+				for (int tx = 1; tx >= 0; tx--)
+				{
+					for (int y = 0; y < 16; y++)
+					{
+						const uint8_t *chr_row = &chr_tile16[(tx*8)+(y*16)];
+						uint8_t row_buffer[4];  // sized for 8 px @ 4bpp
+						pxutil_pack_planar(chr_row, 4, 0x3120, true, row_buffer);
+					fwrite(row_buffer, 1, sizeof(row_buffer), f_chr);
 					}
 				}
 			}
