@@ -399,7 +399,7 @@ void entry_emit_chr(const Entry *e, FILE *f_chr)
 					{
 						const uint8_t *chr_row = &chr_tile16[(tx*8)+(y*16)];
 						uint8_t row_buffer[4];  // sized for 8 px @ 4bpp
-						pxutil_pack_planar(chr_row, 4, 0x3120, true, row_buffer);
+						pxutil_pack_planar(chr_row, 4, 0x3210, true, row_buffer);
 					fwrite(row_buffer, 1, sizeof(row_buffer), f_chr);
 					}
 				}
