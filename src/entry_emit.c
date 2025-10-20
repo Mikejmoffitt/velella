@@ -13,7 +13,7 @@ static const char *get_str_comment(bool c_lang)
 
 static const char *get_str_hex(bool c_lang)
 {
-	return c_lang ? "0x" : "$ ";
+	return c_lang ? "0x" : "$";
 }
 
 static const char *get_str_def(bool c_lang)
@@ -70,7 +70,7 @@ static inline void emit_frame_metrics(const Entry *e, bool c_lang, uint32_t fram
 	const char *k_str_def = get_str_def(c_lang);
 	const char *k_str_equ = get_str_equ(c_lang);
 	const char *k_str_hex = get_str_hex(c_lang);
-	if (frame_offs > 1)
+	if (frame_offs >= 1)
 	{
 		fprintf(f, "%s%s_FRAME_OFFS %s%s%X\n", k_str_def, e->symbol_upper, k_str_equ, k_str_hex, frame_offs);
 	}
@@ -133,6 +133,7 @@ void entry_emit_meta(const Entry *e, FILE *f_inc, int pal_offs, bool c_lang)
 			emit_code(e,               c_lang, "16_HI",(frame_cfg->code>>2) >> 16, f_inc);
 			emit_code(e,               c_lang, "16_LO",(frame_cfg->code>>2) & 0xFFFF, f_inc);
 			emit_src_tex_size(e,       c_lang, f_inc);
+			emit_frame_size(e,         c_lang, f_inc);
 			emit_tile_count_bg(e,      c_lang, f_inc);
 			break;
 
